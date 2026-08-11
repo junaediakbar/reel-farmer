@@ -1,6 +1,6 @@
 # PRD — Reel Farmer
 
-**Versi**: 4.1 · **Status**: Living document · **Terakhir diperbarui**: 11 Agustus 2026
+**Versi**: 4.2 · **Status**: Living document · **Terakhir diperbarui**: 12 Agustus 2026
 **Cakupan**: Bagian 1–5 mendeskripsikan kondisi kode **saat ini** (tool lokal, single-user). Bagian 6–10 mendeskripsikan **arah produk yang sudah diputuskan** menuju SaaS berarsitektur **hybrid desktop app** dan **belum diimplementasikan**.
 
 ---
@@ -153,6 +153,7 @@ Ini **fitur review-manual di atas pipeline otomatis**, bukan sekadar viewer. Men
 - **Editor caption** (`CaptionEditor.tsx`) — edit teks & timing tiap kata (drag untuk resize durasi, klik untuk seek), lalu re-render overlay saja (`regenerateCaptions`) tanpa mengulang seluruh pipeline.
 - **Progress real-time** — polling `/api/runs/:id/progress` untuk progres overall & per-klip.
 - **Delete klip individual** — hapus 1 hasil render beserta artifact-nya tanpa menghapus seluruh run.
+- **Settings** (`Settings.tsx`) — status lisensi + aktivasi, status dependency lokal, dan **input BYOK DeepSeek API key** (`/api/settings/deepseek-key`, disimpan di `settingsPath` per-device, dipakai `requireDeepSeekApiKey()` sebagai fallback dari `.env`).
 
 ### 3.4 Checkpoint & resumability
 
@@ -191,6 +192,12 @@ Diamati langsung dari kode. Kolom **Risiko** = dampak kalau dibiarkan. Kolom **K
 | G10          | **Whisper alignment bisa gagal diam-diam** — tanpa metric seberapa sering meleset.                                                                                                                 | Menengah — kualitas turun tanpa terdeteksi                      | Blocker QA — makin sulit didiagnosis lintas device berbeda-beda                                         |
 | G11 _(baru)_ | **Belum ada mekanisme download dependency pasca-instalasi** — `yt-dlp`, `ffmpeg`, `whisper-cli`, model GGML masih diasumsikan sudah terpasang manual di sistem.                                    | Tinggi untuk jalur installer minimal                            | Blocker Fase 1 (§6.5)                                                                                   |
 | G12 _(baru)_ | **Belum ada license/auth check terhadap cloud** — tidak ada konsep validasi lisensi sama sekali di kode saat ini.                                                                                  | Tinggi                                                          | Blocker Fase 1                                                                                          |
+| G13 _(baru)_ | **Tidak ada konsep "Projects"** — pengelompokan run per channel/klien. Mockup desain (`design/.../projects_management`) mengasumsikan ini; tidak ada nav item, data model (`projectId`), atau route `/api/projects*` di kode. | Rendah — cosmetic sampai ada multi-channel user nyata | Peluang — relevan untuk persona solo repurposer yang pegang 1–3 channel (§1.2) |
+| G14 _(baru)_ | **Tidak ada composed multi-clip timeline / audio track** — `RunDetail.tsx` cuma trim 1 klip di video sumber (`SourceVideoPlayer.tsx`), bukan menyusun beberapa klip terpilih + musik jadi satu timeline. | Menengah | Peluang besar, effort tinggi (L) |
+| G15 _(baru)_ | **Caption editor tanpa live preview** — `CaptionEditor.tsx` cuma edit teks/timing mentah, tidak ada preview video+caption ter-render sebelum regenerate. Lebih luas dari G8 (G8 = belum ada UI *style*, ini = belum ada *preview* sama sekali). | Menengah | Peluang (§7.1, bareng brand kit) |
+| G16 _(baru)_ | **Buat run baru tanpa parameter/preview** — `POST /api/runs` cuma terima `youtubeUrl`/`existingVideoId`; tidak ada preview thumbnail YouTube, atau kontrol jumlah klip target/durasi/bahasa/tipe konten sebelum `IDENTIFY_CLIPS` jalan. | Rendah–menengah | Peluang UX, bukan blocker |
+| G17 _(baru)_ | **Tidak ada targeting platform per klip** — `ClipCandidate`/`RenderedClip` tidak punya field platform (TikTok/Reels/Shorts); Library tidak bisa difilter per platform. | Rendah | Peluang, butuh keputusan produk dulu (1 output generik vs per-platform) |
+| G18 _(baru)_ | **Tidak ada "Generate More Clips" atau undo/redo** — tidak ada endpoint untuk re-run `IDENTIFY_CLIPS` dengan kandidat tambahan pada run yang sudah `awaiting_selection`/`completed`; edit klip di `RunDetail.tsx` tidak punya undo/redo. | Rendah | Peluang kecil |
 
 ---
 
@@ -211,7 +218,7 @@ Diamati langsung dari kode. Kolom **Risiko** = dampak kalau dibiarkan. Kolom **K
 | --- | ------------------------------------------------------------------------------------------------------------------------- | --- | ------ |
 | 5   | Bungkus `src/web/` sebagai UI Tauri — **selesai** (`src-tauri/src/lib.rs` spawn `bun run web` sebagai sidecar, buka webview ke `localhost`)                                                                                       | —   | L      |
 | 6   | Mekanisme download dependency pasca-instalasi (`yt-dlp`, `ffmpeg`, `whisper-cli`, model GGML) dengan progress bar & retry — **selesai** (`dependency-installer.ts` retry+backoff, progress bar di `Setup.tsx`) | G11 | M–L    |
-| 7   | License/auth check ke cloud (online-first, grace period offline) — **ditunda**: belum ada backend lisensi/auth di mana pun (bukan external dependency yang tersedia); butuh keputusan arsitektur (bangun sendiri vs. layanan pihak ketiga) sebelum client-side check bisa ditulis | G12 | M      |
+| 7   | License/auth check ke cloud (online-first, grace period offline) — **client-side selesai** (`license.ts`: `checkLicense`/`activateLicense`, cache di `licenseCachePath`, grace period 7 hari, `LicenseGate.tsx` gate di `App.tsx`; no-op selama `LICENSE_SERVER_URL` belum diset). **Backend belum dibangun** — keputusan: bangun sendiri (bukan pihak ketiga), hosting masih perlu dipilih | G12 | M      |
 | 8   | Auto-update installer — **selesai** (`tauri-plugin-updater` + `tauri-plugin-process`, cek saat startup, install-and-restart silent, endpoint GitHub Releases). Owner/repo GitHub di `tauri.conf.json` masih placeholder `YOUR_GITHUB_ORG/reel-farmer` — ganti begitu repo dipublikasikan; signing keypair digenerate lokal (privat tidak dikomit, publik ada di config) | —   | M      |
 | 9   | Observability alignment — log/metric seberapa sering `alignToReference` jatuh ke fallback (lintas device) — **selesai** (`caption-generator.ts` log warning + runId/clipId saat fallback) | G10 | S      |
 
@@ -222,6 +229,19 @@ Diamati langsung dari kode. Kolom **Risiko** = dampak kalau dibiarkan. Kolom **K
 | 10  | Preview sebelum render final — thumbnail/frame dari titik trim | —   | M      |
 | 11  | UI kontrol caption style (brand kit) di `CaptionEditor.tsx`    | G8  | M      |
 | 12  | Thumbnail/cover auto-generate dari frame terbaik               | G9  | M      |
+
+### Kandidat dari desain UI (`design/stitch_reel_farmer_saas/`), belum diimplementasikan
+
+Ditemukan saat menyesuaikan `src/web/` dengan mockup desain (Agustus 2026) — restyle visual (warna/tipografi/rounded/shadow "Luminous Harvest") sudah diterapkan ke 6 screen yang sudah ada; item di bawah ini murni gap *fungsional* yang mockup asumsikan tapi kode belum punya. Kartu pricing/subscription di mockup `settings_trendy` **sengaja tidak diikuti** — bertentangan dengan keputusan BYOK + flat license (§0.1 #3, §8.1); Settings tetap menampilkan status lisensi flat + BYOK key, bukan tier berbayar.
+
+| #   | Item                                                                                          | Gap | Effort |
+| --- | ----------------------------------------------------------------------------------------------- | --- | ------ |
+| 17  | Halaman "Projects" — kelompokkan run per channel/klien                                          | G13 | M      |
+| 18  | Composed multi-clip timeline + pemilihan trending audio/music track di `RunDetail.tsx`           | G14 | L      |
+| 19  | Live preview video+caption ter-render di `CaptionEditor.tsx` (di luar style controls G8/#11)     | G15 | M–L    |
+| 20  | Preview YouTube (thumbnail/durasi) + parameter run (jumlah klip, durasi target, bahasa, tipe) saat membuat run baru | G16 | M      |
+| 21  | Field & filter platform (TikTok/Reels/Shorts) per klip di Library                                | G17 | S–M    |
+| 22  | Endpoint "Generate More Clips" pada run yang sudah selesai + undo/redo di editor klip            | G18 | S–M    |
 
 ### Nice-to-have / tidak prioritas (eksplisit ditunda)
 
@@ -451,6 +471,7 @@ Fase 1 dianggap siap naik ke Fase 2 (Radar Detector, auto-publish) kalau: app st
 
 | Versi | Perubahan                                                                                                                                                                                                                                                                                                                     |
 | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 4.2   | Sesuaikan `src/web/` dengan mockup desain `design/stitch_reel_farmer_saas/` (restyle visual 6 screen + BYOK DeepSeek API key di Settings, §3.3). Tambah G13–G18 untuk gap fungsional yang mockup asumsikan tapi belum diimplementasikan (Projects, multi-clip timeline+audio, live caption preview, run-creation preview/params, platform filtering, generate-more/undo). Tolak kartu pricing subscription dari mockup Settings — bertentangan dengan keputusan BYOK (§0.1 #3). |
 | 4.0   | Tetapkan Tauri sebagai framework, strategi installer minimal + download dependency pasca-instalasi (G11, §6.4), ubah auto-watch jadi Radar Detector sebagai fitur berbayar nice-to-have (§7.2), tambah G11/G12, update roadmap/metrik/model bisnis sesuai keputusan ini. Gabungkan seluruh bagian (1–10) jadi 1 dokumen utuh. |
 | 4.1   | Tandai item Sprint Fase 0 (#1–#4) dan Fase 1 (#5, #6, #9) sebagai **selesai** di §5, sesuai kondisi kode aktual (dicek via `bun test`: 56 lulus). #7 (license/auth) tetap ditunda — belum ada keputusan arsitektur. |
 | 3.0   | Tetapkan arah: hybrid desktop app + cloud tipis, prioritas solo repurposer, model bisnis BYOK.                                                                                                                                                                                                                                |

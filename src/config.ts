@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { homedir, platform } from "node:os";
 
@@ -34,6 +34,8 @@ export const config = {
   checkpointDbPath: resolve(process.cwd(), "data", "checkpoints.db"),
   modelsDir: resolve(process.cwd(), "models"),
   binDir: process.env.REEL_FARMER_BIN_DIR ?? resolve(appDataDir(), "bin"),
+  licenseCachePath: resolve(appDataDir(), "license.json"),
+  settingsPath: resolve(appDataDir(), "settings.json"),
 
   deepseekApiUrl: process.env.DEEPSEEK_API_URL ?? "https://api.deepseek.com/chat/completions",
 
@@ -53,19 +55,46 @@ export const config = {
   captionWordsPerGroup: 6,
 };
 
+/** Days a cached license stays valid without reaching the license server (offline tolerance). */
+export const LICENSE_GRACE_PERIOD_DAYS = 7;
+
 /**
  * Called only where a DeepSeek call is about to happen — not at startup, so read-only commands
  * (status/clean) work without a key. Reads process.env live (not the config snapshot) so tests
  * can set DEEPSEEK_API_KEY per-test regardless of when config.ts was first imported.
  */
 export function requireDeepSeekApiKey(): string {
-  const key = process.env.DEEPSEEK_API_KEY;
+  const key = process.env.DEEPSEEK_API_KEY || readPersistedSettings().deepseekApiKey;
   if (!key) {
     throw new Error(
-      "DEEPSEEK_API_KEY is not set. Add it to your .env before running a pipeline that identifies clips (BYOK — this is your own DeepSeek key, not provided by Reel Farmer).",
+      "DEEPSEEK_API_KEY is not set. Add it in Settings, or in your .env, before running a pipeline that identifies clips (BYOK — this is your own DeepSeek key, not provided by Reel Farmer).",
     );
   }
   return key;
+}
+
+interface PersistedSettings {
+  deepseekApiKey?: string;
+}
+
+function readPersistedSettings(): PersistedSettings {
+  if (!existsSync(config.settingsPath)) return {};
+  try {
+    return JSON.parse(readFileSync(config.settingsPath, "utf8")) as PersistedSettings;
+  } catch {
+    return {};
+  }
+}
+
+/** Persists the user's own DeepSeek key (BYOK) to disk so it survives restarts without living in .env. */
+export function saveDeepSeekApiKey(key: string): void {
+  writeFileSync(config.settingsPath, JSON.stringify({ ...readPersistedSettings(), deepseekApiKey: key }));
+}
+
+/** Masked status for the Settings UI — never returns the key itself. */
+export function deepSeekApiKeyStatus(): { set: boolean; preview: string | null } {
+  const key = process.env.DEEPSEEK_API_KEY || readPersistedSettings().deepseekApiKey;
+  return key ? { set: true, preview: `••••${key.slice(-4)}` } : { set: false, preview: null };
 }
 
 /**
@@ -75,6 +104,15 @@ export function requireDeepSeekApiKey(): string {
  */
 export function dashboardAuthToken(): string | undefined {
   return process.env.DASHBOARD_AUTH_TOKEN || undefined;
+}
+
+/**
+ * Optional license backend URL. Unset by default — license checks are a no-op until this is
+ * configured (mirrors dashboardAuthToken()'s unset-by-default gate). Reads process.env live so
+ * tests can set/unset LICENSE_SERVER_URL per-test regardless of when config.ts was first imported.
+ */
+export function licenseServerUrl(): string | undefined {
+  return process.env.LICENSE_SERVER_URL || undefined;
 }
 
 /** Called only where whisper-cli is about to run — GENERATE_CAPTIONS always needs this regardless of transcript source. */

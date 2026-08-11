@@ -79,11 +79,11 @@ export function CaptionEditor({ runId, clipId, onClose }: CaptionEditorProps) {
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <section className="card caption-editor" onClick={(e) => e.stopPropagation()}>
+      <section className="glass-panel caption-editor" onClick={(e) => e.stopPropagation()}>
         <header className="caption-editor-header">
           <h2>Edit captions</h2>
-          <button type="button" className="btn-ghost" onClick={onClose}>
-            Close
+          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
+            <span className="material-symbols-outlined">close</span>
           </button>
         </header>
         <div className="caption-groups">
@@ -104,6 +104,7 @@ export function CaptionEditor({ runId, clipId, onClose }: CaptionEditorProps) {
         </div>
         {error && <p className="error-text">{error}</p>}
         <button type="button" className="btn-primary" onClick={regenerate} disabled={saving || groups.length === 0}>
+          <span className="material-symbols-outlined">auto_awesome</span>
           {saving ? "Regenerating…" : "Regenerate overlay"}
         </button>
       </section>

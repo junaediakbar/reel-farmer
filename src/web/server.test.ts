@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ClipCandidate } from "../pipeline/types";
 
@@ -14,6 +15,7 @@ mock.module("../pipeline/orchestrator", () => ({
   finalClipPath: (outputDir: string, clip: ClipCandidate) => join(outputDir, `${clip.title}-${clip.id}.mp4`),
 }));
 
+
 const { createServer } = await import("./server");
 const { CheckpointManager } = await import("../pipeline/checkpoint");
 const { config } = await import("../config");
@@ -24,6 +26,7 @@ let baseUrl: string;
 
 beforeEach(() => {
   processSelectedClipsCalls.length = 0;
+  delete process.env.LICENSE_SERVER_URL;
   checkpoint = new CheckpointManager(":memory:");
   server = createServer(checkpoint, 0);
   baseUrl = `http://localhost:${server.port}`;
@@ -103,6 +106,71 @@ describe("POST /api/runs/:id/select", () => {
   });
 });
 
+describe("POST /api/runs/:id/retry", () => {
+  test("returns 400 for a run that isn't failed", async () => {
+    const run = checkpoint.createRun("run-notfailed", "vid-1", "https://x", null);
+    const res = await fetch(`${baseUrl}/api/runs/${run.id}/retry`, { method: "POST" });
+    expect(res.status).toBe(400);
+  });
+
+  test("failed during a global stage resumes via runUntilSelection", async () => {
+    const run = checkpoint.createRun("run-retry-global", "vid-1", "https://x", null);
+    checkpoint.updateRunStatus(run.id, "failed", "TRANSCRIBE", "boom");
+
+    const res = await fetch(`${baseUrl}/api/runs/${run.id}/retry`, { method: "POST" });
+    expect(res.status).toBe(200);
+    await new Promise((r) => setTimeout(r, 0));
+    const { runUntilSelection } = await import("../pipeline/orchestrator");
+    expect((runUntilSelection as ReturnType<typeof mock>).mock.calls.length).toBeGreaterThan(0);
+  });
+
+  test("failed during clip rendering resumes via processSelectedClips using the persisted clips.json", async () => {
+    const run = checkpoint.createRun("run-retry-clip", "vid-1", "https://x", null);
+    checkpoint.updateRunStatus(run.id, "failed", "EXTRACT_CLIPS", "boom");
+    const runDir = join(config.runsDir, run.id);
+    mkdirSync(runDir, { recursive: true });
+    const selected: ClipCandidate[] = [
+      { id: "c1", title: "Clip", hookLine: "hook", startSec: 0, endSec: 10, reason: "r", viralScore: 1, tags: [] },
+    ];
+    await Bun.write(join(runDir, "clips.json"), JSON.stringify(selected));
+
+    const res = await fetch(`${baseUrl}/api/runs/${run.id}/retry`, { method: "POST" });
+    expect(res.status).toBe(200);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(processSelectedClipsCalls.some((c) => c.runId === run.id)).toBe(true);
+
+    rmSync(runDir, { recursive: true, force: true });
+  });
+});
+
+describe("GET /api/clips", () => {
+  test("returns only clips whose 4 render stages all completed", async () => {
+    const run = checkpoint.createRun("run-lib", "vid-1", "https://x", "My Run");
+    const runDir = join(config.runsDir, run.id);
+    mkdirSync(runDir, { recursive: true });
+    const clips: ClipCandidate[] = [
+      { id: "rendered", title: "Rendered clip", hookLine: "h", startSec: 0, endSec: 20, reason: "r", viralScore: 77, tags: ["a"] },
+      { id: "partial", title: "Partial clip", hookLine: "h", startSec: 0, endSec: 10, reason: "r", viralScore: 10, tags: [] },
+    ];
+    await Bun.write(join(runDir, "clips.json"), JSON.stringify(clips));
+
+    for (const stage of ["EXTRACT_CLIPS", "REMOVE_SILENCE", "GENERATE_CAPTIONS", "COMPOSE_REEL"] as const) {
+      checkpoint.startClipStage(run.id, "rendered", stage);
+      checkpoint.completeClipStage(run.id, "rendered", stage, "/out/rendered.mp4");
+    }
+    checkpoint.startClipStage(run.id, "partial", "EXTRACT_CLIPS");
+    checkpoint.completeClipStage(run.id, "partial", "EXTRACT_CLIPS", "/tmp/raw.mp4");
+
+    const res = await fetch(`${baseUrl}/api/clips`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Array<{ clipId: string; title: string; viralScore: number; durationSec: number }>;
+    expect(body.map((c) => c.clipId)).toEqual(["rendered"]);
+    expect(body[0]).toMatchObject({ title: "Rendered clip", viralScore: 77, durationSec: 20 });
+
+    rmSync(runDir, { recursive: true, force: true });
+  });
+});
+
 describe("GET /api/deps/status", () => {
   test("reports the 4 managed dependencies with an installed flag and size estimate", async () => {
     const res = await fetch(`${baseUrl}/api/deps/status`);
@@ -113,5 +181,68 @@ describe("GET /api/deps/status", () => {
       expect(typeof s.installed).toBe("boolean");
       expect(s.sizeEstimateMb).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("GET /api/license/status", () => {
+  test("is a no-op pass when LICENSE_SERVER_URL is unset", async () => {
+    const res = await fetch(`${baseUrl}/api/license/status`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ valid: true, mode: "disabled" });
+  });
+});
+
+describe("POST /api/license/activate", () => {
+  test("returns 400 when licenseKey is missing", async () => {
+    const res = await fetch(`${baseUrl}/api/license/activate`, { method: "POST", body: JSON.stringify({}) });
+    expect(res.status).toBe(400);
+  });
+
+  test("returns 400 when LICENSE_SERVER_URL is unset (activation requires a configured server)", async () => {
+    const res = await fetch(`${baseUrl}/api/license/activate`, {
+      method: "POST",
+      body: JSON.stringify({ licenseKey: "some-key" }),
+    });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("GET/POST /api/settings/deepseek-key", () => {
+  let testDir: string;
+  let originalSettingsPath: string;
+  let originalDeepSeekEnv: string | undefined;
+
+  beforeEach(() => {
+    originalSettingsPath = config.settingsPath;
+    originalDeepSeekEnv = process.env.DEEPSEEK_API_KEY;
+    delete process.env.DEEPSEEK_API_KEY;
+    testDir = mkdtempSync(join(tmpdir(), "reel-farmer-settings-test-"));
+    config.settingsPath = join(testDir, "settings.json");
+  });
+
+  afterEach(() => {
+    config.settingsPath = originalSettingsPath;
+    if (originalDeepSeekEnv === undefined) delete process.env.DEEPSEEK_API_KEY;
+    else process.env.DEEPSEEK_API_KEY = originalDeepSeekEnv;
+    rmSync(testDir, { recursive: true, force: true });
+  });
+
+  test("reports unset, then set with a masked preview after saving a key", async () => {
+    const before = await fetch(`${baseUrl}/api/settings/deepseek-key`);
+    expect(await before.json()).toEqual({ set: false, preview: null });
+
+    const save = await fetch(`${baseUrl}/api/settings/deepseek-key`, {
+      method: "POST",
+      body: JSON.stringify({ deepseekApiKey: "sk-abcd1234" }),
+    });
+    expect(save.status).toBe(200);
+
+    const after = await fetch(`${baseUrl}/api/settings/deepseek-key`);
+    expect(await after.json()).toEqual({ set: true, preview: "••••1234" });
+  });
+
+  test("returns 400 when deepseekApiKey is missing", async () => {
+    const res = await fetch(`${baseUrl}/api/settings/deepseek-key`, { method: "POST", body: JSON.stringify({}) });
+    expect(res.status).toBe(400);
   });
 });

@@ -93,6 +93,8 @@ export function RunDetail({ runId, onBack, onDeleted }: RunDetailProps) {
     return map;
   }, [data]);
 
+  const topViralScore = useMemo(() => Math.max(0, ...editableClips.map((c) => c.viralScore)), [editableClips]);
+
   function clipStatus(clipId: string): "failed" | "rendered" | "rendering" | "pending" {
     const stages = progressByClip.get(clipId) ?? [];
     if (stages.some((s) => s.status === "failed")) return "failed";
@@ -138,6 +140,11 @@ export function RunDetail({ runId, onBack, onDeleted }: RunDetailProps) {
     onDeleted();
   }
 
+  async function retryRun() {
+    await fetch(`/api/runs/${runId}/retry`, { method: "POST" });
+    refresh();
+  }
+
   async function deleteClipRender(clipId: string) {
     await fetch(`/api/runs/${runId}/clips/${clipId}`, { method: "DELETE" });
     refresh();
@@ -149,97 +156,129 @@ export function RunDetail({ runId, onBack, onDeleted }: RunDetailProps) {
   const canEdit = run.status === "awaiting_selection" || run.status === "running" || run.status === "completed";
 
   return (
-    <div className="page">
-      <button type="button" className="btn-ghost" onClick={onBack}>
-        &larr; Back to runs
-      </button>
-
-      <header className="page-header run-detail-header">
-        <div>
-          <h1>{run.title ?? run.videoUrl}</h1>
-          <span className={`status-badge status-${run.status}`}>{run.status.replace("_", " ")}</span>
+    <>
+      <header className="topbar">
+        <div className="run-detail-header">
+          <button type="button" className="icon-btn" onClick={onBack} aria-label="Back to runs">
+            <span className="material-symbols-outlined">arrow_back</span>
+          </button>
+          <div>
+            <h2>{run.title ?? run.videoUrl}</h2>
+            <span className={`status-badge status-${run.status}`}>{run.status.replace("_", " ")}</span>
+          </div>
         </div>
-        <button type="button" className="btn-ghost" onClick={deleteRun}>
-          Delete run
-        </button>
+        <div className="run-detail-actions">
+          {run.status === "failed" && (
+            <button type="button" className="btn-ghost" onClick={retryRun}>
+              <span className="material-symbols-outlined">refresh</span>
+              Retry
+            </button>
+          )}
+          <button type="button" className="btn-ghost" onClick={deleteRun}>
+            <span className="material-symbols-outlined">delete</span>
+            Delete run
+          </button>
+        </div>
       </header>
 
-      {run.status === "running" && <p className="run-stage">Working: {run.currentStage}</p>}
-      {run.errorMessage && <p className="error-text">{run.errorMessage}</p>}
-      {tokenUsage && <p className="run-stage">DeepSeek tokens used: {tokenUsage.totalTokens.toLocaleString()}</p>}
+      <div className="page">
+        {run.status === "running" && <p className="run-stage">Working: {run.currentStage}</p>}
+        {run.errorMessage && <p className="error-text">{run.errorMessage}</p>}
+        {tokenUsage && <p className="run-stage">DeepSeek tokens used: {tokenUsage.totalTokens.toLocaleString()}</p>}
 
-      {canEdit && (
-        <>
-          {trimTarget && (
-            <SourceVideoPlayer
-              runId={runId}
-              startSec={trimTarget.startSec}
-              endSec={trimTarget.endSec}
-              onChange={(startSec, endSec) => updateClip(trimTarget.id, { startSec, endSec })}
-            />
-          )}
+        {canEdit && (
+          <>
+            {trimTarget && (
+              <SourceVideoPlayer
+                runId={runId}
+                startSec={trimTarget.startSec}
+                endSec={trimTarget.endSec}
+                onChange={(startSec, endSec) => updateClip(trimTarget.id, { startSec, endSec })}
+              />
+            )}
 
-          <section className="card">
-            <h2>Candidate clips</h2>
-            <ul className="clip-list">
-              {editableClips.map((clip) => (
-                <li key={clip.id} className="clip-row">
-                  <input type="checkbox" checked={clip.selected} onChange={(e) => updateClip(clip.id, { selected: e.target.checked })} />
-                  <div className="clip-info">
-                    <input className="clip-title-input" value={clip.title} onChange={(e) => updateClip(clip.id, { title: e.target.value })} />
-                    {clip.hookLine && <p className="clip-hook">{clip.hookLine}</p>}
-                    <div className="clip-trim">
-                      <label>
-                        Start
-                        <input type="number" value={clip.startSec} onChange={(e) => updateClip(clip.id, { startSec: Number(e.target.value) })} />
-                      </label>
-                      <label>
-                        End
-                        <input type="number" value={clip.endSec} onChange={(e) => updateClip(clip.id, { endSec: Number(e.target.value) })} />
-                      </label>
-                      <button type="button" className="btn-ghost" onClick={() => setTrimTargetId(clip.id)}>
-                        Trim on timeline
-                      </button>
+            <section className="card">
+              <h2>Candidate clips</h2>
+              <ul className="clip-list">
+                {editableClips.map((clip) => (
+                  <li key={clip.id} className="clip-row">
+                    <input type="checkbox" checked={clip.selected} onChange={(e) => updateClip(clip.id, { selected: e.target.checked })} />
+                    <div className="clip-info">
+                      <input className="clip-title-input" value={clip.title} onChange={(e) => updateClip(clip.id, { title: e.target.value })} />
+                      {clip.hookLine && <p className="clip-hook">{clip.hookLine}</p>}
+                      <div className="clip-trim">
+                        <label>
+                          Start
+                          <input type="number" value={clip.startSec} onChange={(e) => updateClip(clip.id, { startSec: Number(e.target.value) })} />
+                        </label>
+                        <label>
+                          End
+                          <input type="number" value={clip.endSec} onChange={(e) => updateClip(clip.id, { endSec: Number(e.target.value) })} />
+                        </label>
+                        <button type="button" className="btn-ghost" onClick={() => setTrimTargetId(clip.id)}>
+                          <span className="material-symbols-outlined">content_cut</span>
+                          Trim on timeline
+                        </button>
+                      </div>
+                      <div className="clip-card-meta">
+                        <span className={`status-badge status-${clipStatus(clip.id)}`}>{clipStatus(clip.id)}</span>
+                        <span className={`viral-badge${topViralScore > 0 && clip.viralScore === topViralScore ? " viral-badge-top" : ""}`}>
+                          <span className="material-symbols-outlined icon-fill">
+                            {topViralScore > 0 && clip.viralScore === topViralScore ? "local_fire_department" : "analytics"}
+                          </span>
+                          {clip.viralScore}
+                        </span>
+                        {clip.tags.map((tag) => (
+                          <span key={tag} className="tag-chip">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                      {(clipStatus(clip.id) === "rendered" || clipStatus(clip.id) === "failed") && (
+                        <>
+                          <button type="button" className="btn-ghost" onClick={() => setActiveClipId(clip.id)}>
+                            <span className="material-symbols-outlined">closed_caption</span>
+                            Edit captions
+                          </button>
+                          <button type="button" className="btn-ghost" onClick={() => deleteClipRender(clip.id)}>
+                            <span className="material-symbols-outlined">delete</span>
+                            Delete render
+                          </button>
+                        </>
+                      )}
                     </div>
-                    <span className={`status-badge status-${clipStatus(clip.id)}`}>{clipStatus(clip.id)}</span>
-                    {(clipStatus(clip.id) === "rendered" || clipStatus(clip.id) === "failed") && (
-                      <>
-                        <button type="button" className="btn-ghost" onClick={() => setActiveClipId(clip.id)}>
-                          Edit captions
-                        </button>
-                        <button type="button" className="btn-ghost" onClick={() => deleteClipRender(clip.id)}>
-                          Delete render
-                        </button>
-                      </>
-                    )}
-                  </div>
-                  <button type="button" className="btn-ghost" onClick={() => removeClip(clip.id)}>
-                    Remove
-                  </button>
-                </li>
-              ))}
-            </ul>
+                    <button type="button" className="btn-ghost" onClick={() => removeClip(clip.id)}>
+                      <span className="material-symbols-outlined">close</span>
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
 
-            <button type="button" className="btn-ghost" onClick={addCustomClip}>
-              + Add custom clip
-            </button>
-
-            <div className="import-json">
-              <textarea placeholder="Paste a JSON array of clips to import…" value={importText} onChange={(e) => setImportText(e.target.value)} />
-              <button type="button" className="btn-ghost" onClick={importJson}>
-                Import JSON
+              <button type="button" className="btn-ghost" onClick={addCustomClip}>
+                <span className="material-symbols-outlined">add</span>
+                Add custom clip
               </button>
-              {importError && <p className="error-text">{importError}</p>}
-            </div>
 
-            <button type="button" className="btn-primary" onClick={renderSelected} disabled={rendering || run.status === "running"}>
-              {rendering || run.status === "running" ? "Rendering…" : "Render selected"}
-            </button>
-          </section>
-        </>
-      )}
+              <div className="import-json">
+                <textarea placeholder="Paste a JSON array of clips to import…" value={importText} onChange={(e) => setImportText(e.target.value)} />
+                <button type="button" className="btn-ghost" onClick={importJson}>
+                  <span className="material-symbols-outlined">upload_file</span>
+                  Import JSON
+                </button>
+                {importError && <p className="error-text">{importError}</p>}
+              </div>
 
-      {activeClipId && <CaptionEditor runId={runId} clipId={activeClipId} onClose={() => setActiveClipId(null)} />}
-    </div>
+              <button type="button" className="btn-primary" onClick={renderSelected} disabled={rendering || run.status === "running"}>
+                <span className="material-symbols-outlined">movie</span>
+                {rendering || run.status === "running" ? "Rendering…" : "Render selected"}
+              </button>
+            </section>
+          </>
+        )}
+
+        {activeClipId && <CaptionEditor runId={runId} clipId={activeClipId} onClose={() => setActiveClipId(null)} />}
+      </div>
+    </>
   );
 }
