@@ -1,6 +1,6 @@
 # PRD — Reel Farmer
 
-**Versi**: 4.0 · **Status**: Living document · **Terakhir diperbarui**: 11 Agustus 2026
+**Versi**: 4.1 · **Status**: Living document · **Terakhir diperbarui**: 11 Agustus 2026
 **Cakupan**: Bagian 1–5 mendeskripsikan kondisi kode **saat ini** (tool lokal, single-user). Bagian 6–10 mendeskripsikan **arah produk yang sudah diputuskan** menuju SaaS berarsitektur **hybrid desktop app** dan **belum diimplementasikan**.
 
 ---
@@ -200,20 +200,20 @@ Diamati langsung dari kode. Kolom **Risiko** = dampak kalau dibiarkan. Kolom **K
 
 | #   | Item                                                                                                                 | Gap | Effort | Kenapa sekarang                                                         |
 | --- | -------------------------------------------------------------------------------------------------------------------- | --- | ------ | ----------------------------------------------------------------------- |
-| 1   | Sinkronkan `README.md` & `AGENTS.md` dengan kondisi kode aktual                                                      | G3  | S      | Cepat, mencegah kebingungan onboarding                                  |
-| 2   | Retry + exponential backoff + validasi JSON ketat untuk DeepSeek, dengan pesan error yang ramah untuk user BYOK awam | G1  | S–M    | Pipeline paling rapuh; makin kritis karena user sendiri yang pegang key |
-| 3   | Test coverage `src/web/` — endpoint API + logic non-trivial (drag-resize, JSON import parsing)                       | G5  | M      | Fondasi sebelum dibungkus jadi desktop app                              |
-| 4   | Tracking biaya/pemakaian API per run, ditampilkan ke user                                                            | G7  | M      | UX penting untuk model BYOK                                             |
+| 1   | Sinkronkan `README.md` & `AGENTS.md` dengan kondisi kode aktual — **selesai** (tidak ada lagi referensi Gemini/`GEMINI_API_KEY`) | G3  | S      | Cepat, mencegah kebingungan onboarding                                  |
+| 2   | Retry + exponential backoff + validasi JSON ketat untuk DeepSeek, dengan pesan error yang ramah untuk user BYOK awam — **selesai** (`clip-identifier.ts`: `callDeepSeek` backoff transport/5xx, `friendlyDeepSeekError` untuk auth/JSON) | G1  | S–M    | Pipeline paling rapuh; makin kritis karena user sendiri yang pegang key |
+| 3   | Test coverage `src/web/` — endpoint API + logic non-trivial (drag-resize, JSON import parsing) — **selesai** (`CaptionEditor.test.ts`, `RunDetail.test.ts`, `server.test.ts`; 56 test lulus di seluruh repo) | G5  | M      | Fondasi sebelum dibungkus jadi desktop app                              |
+| 4   | Tracking biaya/pemakaian API per run, ditampilkan ke user — **selesai** (`callDeepSeek` mengembalikan `tokenUsage`, ditampilkan di `RunDetail.tsx`) | G7  | M      | UX penting untuk model BYOK                                             |
 
 ### Fase 1 — Packaging desktop app (prioritas berikutnya setelah Fase 0)
 
 | #   | Item                                                                                                                      | Gap | Effort |
 | --- | ------------------------------------------------------------------------------------------------------------------------- | --- | ------ |
-| 5   | Bungkus `src/web/` sebagai UI Tauri                                                                                       | —   | L      |
-| 6   | Mekanisme download dependency pasca-instalasi (`yt-dlp`, `ffmpeg`, `whisper-cli`, model GGML) dengan progress bar & retry | G11 | M–L    |
+| 5   | Bungkus `src/web/` sebagai UI Tauri — **selesai** (`src-tauri/src/lib.rs` spawn `bun run web` sebagai sidecar, buka webview ke `localhost`)                                                                                       | —   | L      |
+| 6   | Mekanisme download dependency pasca-instalasi (`yt-dlp`, `ffmpeg`, `whisper-cli`, model GGML) dengan progress bar & retry — **selesai** (`dependency-installer.ts` retry+backoff, progress bar di `Setup.tsx`) | G11 | M–L    |
 | 7   | License/auth check ke cloud (online-first, grace period offline) — **ditunda**: belum ada backend lisensi/auth di mana pun (bukan external dependency yang tersedia); butuh keputusan arsitektur (bangun sendiri vs. layanan pihak ketiga) sebelum client-side check bisa ditulis | G12 | M      |
 | 8   | Auto-update installer — **selesai** (`tauri-plugin-updater` + `tauri-plugin-process`, cek saat startup, install-and-restart silent, endpoint GitHub Releases). Owner/repo GitHub di `tauri.conf.json` masih placeholder `YOUR_GITHUB_ORG/reel-farmer` — ganti begitu repo dipublikasikan; signing keypair digenerate lokal (privat tidak dikomit, publik ada di config) | —   | M      |
-| 9   | Observability alignment — log/metric seberapa sering `alignToReference` jatuh ke fallback (lintas device)                 | G10 | S      |
+| 9   | Observability alignment — log/metric seberapa sering `alignToReference` jatuh ke fallback (lintas device) — **selesai** (`caption-generator.ts` log warning + runId/clipId saat fallback) | G10 | S      |
 
 ### Prioritas menengah (bisa paralel dengan Fase 1, tidak blocking)
 
@@ -452,6 +452,7 @@ Fase 1 dianggap siap naik ke Fase 2 (Radar Detector, auto-publish) kalau: app st
 | Versi | Perubahan                                                                                                                                                                                                                                                                                                                     |
 | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 4.0   | Tetapkan Tauri sebagai framework, strategi installer minimal + download dependency pasca-instalasi (G11, §6.4), ubah auto-watch jadi Radar Detector sebagai fitur berbayar nice-to-have (§7.2), tambah G11/G12, update roadmap/metrik/model bisnis sesuai keputusan ini. Gabungkan seluruh bagian (1–10) jadi 1 dokumen utuh. |
+| 4.1   | Tandai item Sprint Fase 0 (#1–#4) dan Fase 1 (#5, #6, #9) sebagai **selesai** di §5, sesuai kondisi kode aktual (dicek via `bun test`: 56 lulus). #7 (license/auth) tetap ditunda — belum ada keputusan arsitektur. |
 | 3.0   | Tetapkan arah: hybrid desktop app + cloud tipis, prioritas solo repurposer, model bisnis BYOK.                                                                                                                                                                                                                                |
 | 2.0   | Tambah TL;DR, daftar isi, Quick Start, persona & prinsip produk, tabel gap, jalur SaaS bertahap, kandidat fitur SaaS, model bisnis, metrik keberhasilan, glosarium                                                                                                                                                            |
 | 1.0   | Dokumen awal: fitur saat ini, gap, saran pengembangan                                                                                                                                                                                                                                                                         |
