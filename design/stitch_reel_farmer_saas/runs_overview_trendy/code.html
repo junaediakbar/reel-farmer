@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Reel Farmer - Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-container": "#6063ee",
+                        "tertiary-fixed-dim": "#ffafd3",
+                        "surface-container-low": "#eff4ff",
+                        "on-secondary": "#ffffff",
+                        "on-tertiary-fixed-variant": "#85145a",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-primary-fixed-variant": "#2f2ebe",
+                        "tertiary-fixed": "#ffd8e7",
+                        "on-primary-container": "#fffbff",
+                        "surface-container-lowest": "#ffffff",
+                        "on-surface-variant": "#464554",
+                        "error-container": "#ffdad6",
+                        "on-secondary-fixed": "#2c0051",
+                        "on-tertiary-fixed": "#3d0026",
+                        "background": "#f8f9ff",
+                        "primary-fixed-dim": "#c0c1ff",
+                        "tertiary-container": "#c0488a",
+                        "secondary-fixed-dim": "#ddb7ff",
+                        "on-primary": "#ffffff",
+                        "surface-container": "#e5eeff",
+                        "surface-container-high": "#dce9ff",
+                        "on-error": "#ffffff",
+                        "secondary-container": "#9c48ea",
+                        "on-tertiary-container": "#fffbff",
+                        "surface-bright": "#f8f9ff",
+                        "secondary": "#8127cf",
+                        "surface-variant": "#d3e4fe",
+                        "on-error-container": "#93000a",
+                        "outline": "#767586",
+                        "error": "#ba1a1a",
+                        "primary": "#4648d4",
+                        "on-surface": "#0b1c30",
+                        "outline-variant": "#c7c4d7",
+                        "surface-tint": "#494bd6",
+                        "on-secondary-container": "#fffbff",
+                        "surface": "#f8f9ff",
+                        "surface-container-highest": "#d3e4fe",
+                        "surface-dim": "#cbdbf5",
+                        "tertiary": "#a12e70",
+                        "on-primary-fixed": "#07006c",
+                        "on-secondary-fixed-variant": "#6900b3",
+                        "inverse-surface": "#213145",
+                        "inverse-primary": "#c0c1ff",
+                        "on-tertiary": "#ffffff",
+                        "secondary-fixed": "#f0dbff",
+                        "on-background": "#0b1c30",
+                        "primary-fixed": "#e1e0ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "stack-sm": "12px",
+                        "gutter": "24px",
+                        "margin-desktop": "64px",
+                        "stack-md": "24px",
+                        "margin-mobile": "20px",
+                        "base": "8px",
+                        "container-max": "1440px",
+                        "stack-lg": "48px"
+                    },
+                    "fontFamily": {
+                        "label-sm": ["Plus Jakarta Sans"],
+                        "display-lg": ["Plus Jakarta Sans"],
+                        "body-md": ["Plus Jakarta Sans"],
+                        "headline-lg-mobile": ["Plus Jakarta Sans"],
+                        "label-md": ["Plus Jakarta Sans"],
+                        "body-lg": ["Plus Jakarta Sans"],
+                        "headline-lg": ["Plus Jakarta Sans"],
+                        "headline-md": ["Plus Jakarta Sans"]
+                    },
+                    "fontSize": {
+                        "label-sm": ["12px", { "lineHeight": "1", "fontWeight": "500" }],
+                        "display-lg": ["48px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "800" }],
+                        "body-md": ["16px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "1.3", "fontWeight": "700" }],
+                        "label-md": ["14px", { "lineHeight": "1", "letterSpacing": "0.02em", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.25", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "1.4", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8f9ff; color: #0b1c30; }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 10px 40px -10px rgba(99, 102, 241, 0.08);
+        }
+        .soft-shadow {
+            box-shadow: 0 20px 40px -10px rgba(99, 102, 241, 0.08);
+        }
+    </style>
+</head>
+<body class="bg-background flex h-screen overflow-hidden">
+<!-- SideNavBar -->
+<aside class="hidden md:flex flex-col fixed left-0 top-0 h-full w-64 bg-surface-container-lowest border-r border-outline-variant shadow-sm z-50 p-6 gap-stack-md">
+<div class="flex items-center gap-3 mb-4">
+<span class="material-symbols-outlined text-primary text-3xl" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">Reel Farmer</h1>
+<p class="font-label-sm text-label-sm text-on-surface-variant">AI Video Studio</p>
+</div>
+</div>
+<button class="w-full bg-primary text-on-primary py-3 px-4 rounded-full font-label-md text-label-md flex items-center justify-center gap-2 hover:bg-primary-container hover:text-on-primary-container transition-all shadow-md hover:shadow-lg scale-95 active:scale-90">
+<span class="material-symbols-outlined">add</span>
+            Create New Run
+        </button>
+<nav class="flex-1 flex flex-col gap-2 mt-4">
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary-container text-on-primary-container font-label-md text-label-md font-bold" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">play_circle</span>
+                Runs
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-surface-container-high transition-colors font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">video_library</span>
+                Library
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-surface-container-high transition-colors font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">auto_awesome_motion</span>
+                Templates
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-surface-container-high transition-colors font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">payments</span>
+                Billing
+            </a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-surface-container-high transition-colors font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">settings</span>
+                Settings
+            </a>
+</nav>
+<div class="mt-auto">
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-surface-container-high transition-colors font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">help</span>
+                Help Center
+            </a>
+</div>
+</aside>
+<!-- Main Content Wrapper -->
+<div class="flex-1 ml-0 md:ml-64 flex flex-col h-full overflow-y-auto">
+<!-- TopAppBar -->
+<header class="flex items-center justify-between px-margin-mobile md:px-margin-desktop py-4 sticky top-0 z-40 bg-surface/70 backdrop-blur-xl w-full h-20">
+<h2 class="font-headline-md text-headline-md text-primary font-bold">Dashboard</h2>
+<div class="flex items-center gap-4">
+<button class="p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors cursor-pointer">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors cursor-pointer">
+<span class="material-symbols-outlined">mail</span>
+</button>
+<button class="bg-primary text-on-primary px-4 py-2 rounded-full font-label-md text-label-md hidden md:flex items-center gap-2 hover:bg-primary-container hover:text-on-primary-container transition-all shadow-sm">
+                    New Video
+                </button>
+<div class="w-10 h-10 rounded-full bg-surface-container-high overflow-hidden border-2 border-surface">
+<img class="w-full h-full object-cover" data-alt="A small, circular avatar portrait of a modern professional user with a gentle smile, shot against a clean, light-mode background with soft lighting, matching the platform's approachable soft-tech aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCOwkKh4F5ONXKJ33e_dPWhwogGHOJGUOyDfoe95MpyL435mtXqoh4XshUx6cpgJixhxzH9thgMBTtJwL1DfY4ZFoefyfQpTPvcb5Q4C4mbxNZySKWQn4UPVghFbQS39WEFVRjguIQqfShz-STzAhpwOasmZqRWE8GMXYrDshG1_iGdAwIGYzbO-SRMsUy2pQDrz2zY7itgqgwR5f3WlsdntQdWq4eFjTOa5CMcHGW-1bsuEBinvmw5"/>
+</div>
+</div>
+</header>
+<!-- Canvas -->
+<main class="flex-1 p-margin-mobile md:p-margin-desktop pt-6 flex flex-col gap-stack-lg max-w-container-max mx-auto w-full">
+<!-- Hero / Overview Stats (Glassmorphism) -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+<div class="glass-panel rounded-2xl p-6 flex flex-col gap-2">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="font-label-md text-label-md">Total Runs</span>
+<span class="material-symbols-outlined text-primary">play_circle</span>
+</div>
+<div class="font-display-lg text-display-lg text-on-surface">1,248</div>
+<div class="font-label-sm text-label-sm text-primary">+12% from last week</div>
+</div>
+<div class="glass-panel rounded-2xl p-6 flex flex-col gap-2">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="font-label-md text-label-md">Clips Generated</span>
+<span class="material-symbols-outlined text-secondary">movie</span>
+</div>
+<div class="font-display-lg text-display-lg text-on-surface">8,932</div>
+<div class="font-label-sm text-label-sm text-secondary">+5% from last week</div>
+</div>
+<div class="glass-panel rounded-2xl p-6 flex flex-col gap-2">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="font-label-md text-label-md">Storage Used</span>
+<span class="material-symbols-outlined text-tertiary">cloud</span>
+</div>
+<div class="font-display-lg text-display-lg text-on-surface">45.2 <span class="font-headline-md text-headline-md">GB</span></div>
+<div class="w-full bg-surface-container h-2 rounded-full mt-2 overflow-hidden">
+<div class="bg-gradient-to-r from-tertiary-fixed-dim to-tertiary h-full w-3/4 rounded-full"></div>
+</div>
+</div>
+</section>
+<!-- Recent Runs Grid -->
+<section class="flex flex-col gap-stack-md">
+<div class="flex items-center justify-between">
+<h3 class="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">Recent Runs</h3>
+<a class="font-label-md text-label-md text-primary flex items-center gap-1 hover:underline" href="#">
+                        View All
+                        <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</a>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter">
+<!-- Card 1 -->
+<div class="bg-surface-container-lowest rounded-2xl p-3 soft-shadow flex flex-col gap-3 group cursor-pointer transition-transform hover:-translate-y-1">
+<div class="aspect-video rounded-xl overflow-hidden relative">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A vibrant, cinematic wide-shot thumbnail image showing a futuristic cityscape at sunset, rendered with bright neon pinks and purples, fitting a modern AI video generation platform's soft-tech aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDmJTqbh8nY-yde0q4K6b8HS_Yak5tPqUB3kmVupGSNAf2wJ2Ru3nWB_BIEcUqOs8gcmhyeqmT0ebufxZc6gWHt3AG6jwm9lEwRpJ7gJFd5BqXbk3BdFQsecRpfTpXJ5eiFxNZhrDEEg_FraKAhlcyJf2l43_3ZXDQaxtuKjv7oT4Uyg-XIz5_p86-lzGF6zGKL7kkeM1fRdEC5_0sCBFbNXf5CRKnbhE4V92hI-69UzfCytWRw68VZ"/>
+<div class="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-white text-4xl" style="font-variation-settings: 'FILL' 1;">play_circle</span>
+</div>
+<div class="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white px-2 py-1 rounded text-xs font-label-sm">02:14</div>
+</div>
+<div class="px-1">
+<h4 class="font-label-md text-label-md text-on-surface truncate">Neon Cityscape B-Roll</h4>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-1">Generated 2h ago</p>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface-container-lowest rounded-2xl p-3 soft-shadow flex flex-col gap-3 group cursor-pointer transition-transform hover:-translate-y-1">
+<div class="aspect-video rounded-xl overflow-hidden relative">
+<img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" data-alt="A peaceful, high-quality video thumbnail featuring a lush, green forest stream with soft, volumetric light filtering through the canopy, aligning with a premium, approachable design system." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB-HQQOhJzr9nPBzsjX-r_9z2SatfoRdhs9fKz92DNSUvOOzximr60iXQaXf7P0ILSfba7N8xjxWnaoDOGfTm5f2t30P3rOGBRvTOEtM7o0i_v18NZsjkL5hzIIuMSR-VMg_V9Yi_VT6jP2yE4dxif8inhJ8dMMX_qsNDRQfsEqbU9VNc1uiMI5fWlBWzs2UTWgBiBhoV-qYQiRred1fC1h-usAbM8-GLz2Pf_qjLOSoER4A26Kr15z"/>
+<div class="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-white text-4xl" style="font-variation-settings: 'FILL' 1;">play_circle</span>
+</div>
+<div class="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white px-2 py-1 rounded text-xs font-label-sm">00:45</div>
+</div>
+<div class="px-1">
+<h4 class="font-label-md text-label-md text-on-surface truncate">Nature Doc Intro</h4>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-1">Generated 5h ago</p>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="bg-surface-container-lowest rounded-2xl p-3 soft-shadow flex flex-col gap-3 group cursor-pointer transition-transform hover:-translate-y-1">
+<div class="aspect-video rounded-xl overflow-hidden relative bg-surface-container flex items-center justify-center">
+<span class="material-symbols-outlined text-outline-variant text-4xl animate-pulse">hourglass_empty</span>
+<div class="absolute bottom-2 left-2 right-2">
+<div class="w-full bg-surface-variant h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-2/3 rounded-full"></div>
+</div>
+</div>
+</div>
+<div class="px-1">
+<h4 class="font-label-md text-label-md text-on-surface truncate">Product Demo v2</h4>
+<p class="font-label-sm text-label-sm text-primary mt-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">sync</span> Processing... 66%
+                            </p>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="bg-surface-container-lowest rounded-2xl p-3 soft-shadow flex flex-col gap-3 group cursor-pointer transition-transform hover:-translate-y-1 border border-dashed border-outline-variant hover:border-primary">
+<div class="aspect-video rounded-xl overflow-hidden relative bg-surface-container-low flex flex-col items-center justify-center text-primary gap-2">
+<span class="material-symbols-outlined text-3xl">add_circle</span>
+<span class="font-label-md text-label-md">Start New Run</span>
+</div>
+<div class="px-1 text-center">
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-1">Create from template or scratch</p>
+</div>
+</div>
+</div>
+</section>
+</main>
+</div>
+</body></html>

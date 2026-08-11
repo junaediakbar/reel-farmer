@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Reel Farmer - Selection Phase</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-family: 'Material Symbols Outlined';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-feature-settings: 'liga';
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        /* Glassmorphism utilities */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 8px 32px 0 rgba(99, 102, 241, 0.08);
+        }
+
+        .glass-dark {
+            background: rgba(33, 49, 69, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Custom Scrollbar for clip list */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 20px;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary-container": "#6063ee",
+                        "tertiary-fixed-dim": "#ffafd3",
+                        "surface-container-low": "#eff4ff",
+                        "on-secondary": "#ffffff",
+                        "on-tertiary-fixed-variant": "#85145a",
+                        "inverse-on-surface": "#eaf1ff",
+                        "on-primary-fixed-variant": "#2f2ebe",
+                        "tertiary-fixed": "#ffd8e7",
+                        "on-primary-container": "#fffbff",
+                        "surface-container-lowest": "#ffffff",
+                        "on-surface-variant": "#464554",
+                        "error-container": "#ffdad6",
+                        "on-secondary-fixed": "#2c0051",
+                        "on-tertiary-fixed": "#3d0026",
+                        "background": "#f8f9ff",
+                        "primary-fixed-dim": "#c0c1ff",
+                        "tertiary-container": "#c0488a",
+                        "secondary-fixed-dim": "#ddb7ff",
+                        "on-primary": "#ffffff",
+                        "surface-container": "#e5eeff",
+                        "surface-container-high": "#dce9ff",
+                        "on-error": "#ffffff",
+                        "secondary-container": "#9c48ea",
+                        "on-tertiary-container": "#fffbff",
+                        "surface-bright": "#f8f9ff",
+                        "secondary": "#8127cf",
+                        "surface-variant": "#d3e4fe",
+                        "on-error-container": "#93000a",
+                        "outline": "#767586",
+                        "error": "#ba1a1a",
+                        "primary": "#4648d4",
+                        "on-surface": "#0b1c30",
+                        "outline-variant": "#c7c4d7",
+                        "surface-tint": "#494bd6",
+                        "on-secondary-container": "#fffbff",
+                        "surface": "#f8f9ff",
+                        "surface-container-highest": "#d3e4fe",
+                        "surface-dim": "#cbdbf5",
+                        "tertiary": "#a12e70",
+                        "on-primary-fixed": "#07006c",
+                        "on-secondary-fixed-variant": "#6900b3",
+                        "inverse-surface": "#213145",
+                        "inverse-primary": "#c0c1ff",
+                        "on-tertiary": "#ffffff",
+                        "secondary-fixed": "#f0dbff",
+                        "on-background": "#0b1c30",
+                        "primary-fixed": "#e1e0ff"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "2xl": "1rem",
+                        "3xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                    spacing: {
+                        "stack-sm": "12px",
+                        "gutter": "24px",
+                        "margin-desktop": "64px",
+                        "stack-md": "24px",
+                        "margin-mobile": "20px",
+                        "base": "8px",
+                        "container-max": "1440px",
+                        "stack-lg": "48px"
+                    },
+                    fontFamily: {
+                        "label-sm": ["Plus Jakarta Sans"],
+                        "display-lg": ["Plus Jakarta Sans"],
+                        "body-md": ["Plus Jakarta Sans"],
+                        "headline-lg-mobile": ["Plus Jakarta Sans"],
+                        "label-md": ["Plus Jakarta Sans"],
+                        "body-lg": ["Plus Jakarta Sans"],
+                        "headline-lg": ["Plus Jakarta Sans"],
+                        "headline-md": ["Plus Jakarta Sans"]
+                    },
+                    fontSize: {
+                        "label-sm": ["12px", { lineHeight: "1", fontWeight: "500" }],
+                        "display-lg": ["48px", { lineHeight: "1.2", letterSpacing: "-0.02em", fontWeight: "800" }],
+                        "body-md": ["16px", { lineHeight: "1.6", fontWeight: "400" }],
+                        "headline-lg-mobile": ["28px", { lineHeight: "1.3", fontWeight: "700" }],
+                        "label-md": ["14px", { lineHeight: "1", letterSpacing: "0.02em", fontWeight: "600" }],
+                        "body-lg": ["18px", { lineHeight: "1.6", fontWeight: "400" }],
+                        "headline-lg": ["32px", { lineHeight: "1.25", letterSpacing: "-0.01em", fontWeight: "700" }],
+                        "headline-md": ["24px", { lineHeight: "1.4", fontWeight: "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background min-h-screen text-on-background font-body-md selection:bg-primary selection:text-white">
+<!-- Top Navigation App Bar -->
+<header class="w-full h-20 bg-surface/70 backdrop-blur-xl flex items-center justify-between px-margin-desktop py-4 sticky top-0 z-40">
+<div class="flex items-center gap-4">
+<h1 class="font-headline-md text-headline-md font-bold text-primary tracking-tight">Reel Farmer</h1>
+<span class="text-on-surface-variant px-3 py-1 bg-surface-container rounded-full font-label-sm text-label-sm border border-outline-variant/30">Selection Phase</span>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex gap-2">
+<button class="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-container-high transition-colors text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="undo">undo</span>
+</button>
+<button class="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-container-high transition-colors text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="redo">redo</span>
+</button>
+</div>
+<button class="px-6 py-2.5 rounded-full bg-gradient-to-r from-primary to-secondary text-white font-label-md text-label-md shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all hover:-translate-y-0.5">
+                Export Selected
+            </button>
+</div>
+</header>
+<!-- Main Workspace -->
+<main class="max-w-container-max mx-auto px-margin-desktop py-stack-md grid grid-cols-12 gap-gutter h-[calc(100vh-80px)]">
+<!-- Left Column: Video Preview & Timeline -->
+<div class="col-span-12 lg:col-span-8 flex flex-col gap-stack-md h-full">
+<!-- Video Player Canvas -->
+<div class="flex-grow bg-surface-container-lowest rounded-3xl overflow-hidden relative shadow-sm border border-outline-variant/20 flex flex-col">
+<!-- Video Area -->
+<div class="flex-grow bg-black relative flex items-center justify-center">
+<!-- Placeholder for actual video content -->
+<div class="absolute inset-0 bg-[url('placeholder')] bg-cover bg-center opacity-80" data-alt="A modern, high-tech AI video generation interface showing a preview of a digital avatar speaking. Soft cinematic lighting with blue and purple hues."></div>
+<!-- Playback Controls (Glassmorphism Overlay) -->
+<div class="absolute bottom-6 left-1/2 -translate-x-1/2 glass-panel rounded-full px-6 py-3 flex items-center gap-6 z-10">
+<button class="text-on-surface hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="skip_previous">skip_previous</span>
+</button>
+<button class="w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center hover:scale-105 transition-transform shadow-lg shadow-primary/30">
+<span class="material-symbols-outlined" data-icon="play_arrow" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+<button class="text-on-surface hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="skip_next">skip_next</span>
+</button>
+<div class="w-px h-6 bg-outline-variant/50 mx-2"></div>
+<button class="text-on-surface hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="volume_up">volume_up</span>
+</button>
+<button class="text-on-surface hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="fullscreen">fullscreen</span>
+</button>
+</div>
+<!-- Overlay Badges -->
+<div class="absolute top-6 left-6 glass-panel rounded-lg px-3 py-1.5 flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+<span class="font-label-sm text-label-sm text-on-surface">Clip 04 - AI Generated</span>
+</div>
+</div>
+</div>
+<!-- Soft Timeline Area -->
+<div class="h-48 glass-panel rounded-3xl p-6 flex flex-col gap-4">
+<div class="flex justify-between items-center">
+<h3 class="font-label-md text-label-md text-on-surface">Timeline Compilation</h3>
+<div class="flex gap-2">
+<button class="w-8 h-8 rounded-full bg-surface flex items-center justify-center hover:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined text-[18px]" data-icon="zoom_out">zoom_out</span>
+</button>
+<button class="w-8 h-8 rounded-full bg-surface flex items-center justify-center hover:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined text-[18px]" data-icon="zoom_in">zoom_in</span>
+</button>
+</div>
+</div>
+<!-- Timeline Tracks -->
+<div class="flex-grow relative bg-surface-container-low rounded-xl overflow-hidden p-2 flex flex-col gap-2">
+<!-- Playhead -->
+<div class="absolute top-0 bottom-0 left-[30%] w-0.5 bg-primary z-20">
+<div class="absolute -top-1 -translate-x-1/2 w-3 h-3 rounded-full bg-primary"></div>
+</div>
+<!-- Track 1: Video -->
+<div class="h-10 w-full relative flex gap-1">
+<div class="h-full w-[25%] bg-primary-fixed rounded-lg border border-primary/20 flex items-center px-2 relative group cursor-pointer hover:bg-primary-fixed-dim transition-colors">
+<span class="font-label-sm text-label-sm text-on-primary-fixed truncate">Intro Hook</span>
+</div>
+<div class="h-full w-[45%] bg-secondary-fixed rounded-lg border border-secondary/20 flex items-center px-2 relative group cursor-pointer hover:bg-secondary-fixed-dim transition-colors">
+<span class="font-label-sm text-label-sm text-on-secondary-fixed truncate">Main Content - Value Prop</span>
+<!-- Soft handles -->
+<div class="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-white rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity cursor-ew-resize"></div>
+<div class="absolute right-0 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-white rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity cursor-ew-resize"></div>
+</div>
+<div class="h-full w-[20%] bg-tertiary-fixed rounded-lg border border-tertiary/20 flex items-center px-2 relative group cursor-pointer hover:bg-tertiary-fixed-dim transition-colors">
+<span class="font-label-sm text-label-sm text-on-tertiary-fixed truncate">CTA Outro</span>
+</div>
+</div>
+<!-- Track 2: Audio -->
+<div class="h-10 w-full relative flex gap-1">
+<div class="h-full w-full bg-surface-variant rounded-lg border border-outline-variant/30 flex items-center px-2 overflow-hidden">
+<!-- Faux waveform -->
+<svg class="w-full h-full text-primary/30" preserveaspectratio="none" viewbox="0 0 100 10">
+<path class="animate-[pulse_2s_infinite]" d="M0,5 Q5,1 10,5 T20,5 T30,5 T40,5 T50,5 T60,5 T70,5 T80,5 T90,5 T100,5" fill="none" stroke="currentColor" stroke-width="0.5"></path>
+</svg>
+<span class="absolute left-2 font-label-sm text-label-sm text-on-surface-variant">Trending Audio: "Corporate Uplift"</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: AI Generated Clips -->
+<div class="col-span-12 lg:col-span-4 bg-surface-container-lowest rounded-3xl shadow-sm border border-outline-variant/20 flex flex-col h-full overflow-hidden">
+<!-- Header -->
+<div class="p-6 border-b border-outline-variant/20 flex justify-between items-center bg-white sticky top-0 z-10">
+<div>
+<h2 class="font-headline-md text-headline-md text-on-surface">AI Selections</h2>
+<p class="font-body-md text-label-sm text-on-surface-variant mt-1">4 clips identified</p>
+</div>
+<button class="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-primary hover:bg-primary-container hover:text-on-primary-container transition-colors">
+<span class="material-symbols-outlined text-[20px]" data-icon="filter_list">filter_list</span>
+</button>
+</div>
+<!-- Clip List (Scrollable) -->
+<div class="flex-grow overflow-y-auto p-4 custom-scrollbar flex flex-col gap-4">
+<!-- Selected Clip Card -->
+<div class="glass-panel rounded-2xl p-3 border-2 border-primary relative cursor-pointer group">
+<div class="absolute -top-3 -right-3 w-6 h-6 bg-primary rounded-full flex items-center justify-center text-white shadow-md z-10">
+<span class="material-symbols-outlined text-[16px]" data-icon="check" style="font-variation-settings: 'FILL' 1;">check</span>
+</div>
+<div class="flex gap-3">
+<div class="w-24 h-32 rounded-xl bg-[url('placeholder')] bg-cover bg-center overflow-hidden relative flex-shrink-0" data-alt="Thumbnail of a video showing a young professional gesturing excitedly in a modern office space.">
+<div class="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors"></div>
+<span class="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/60 text-white font-label-sm text-[10px] backdrop-blur-sm">0:15</span>
+</div>
+<div class="flex flex-col justify-between py-1">
+<div>
+<h4 class="font-label-md text-label-md text-on-surface line-clamp-2">High-Energy Hook: Product Reveal</h4>
+<div class="flex flex-wrap gap-1 mt-2">
+<span class="px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed font-label-sm text-[10px]">Excitement</span>
+<span class="px-2 py-0.5 rounded-full bg-surface-variant text-on-surface-variant font-label-sm text-[10px]">Face Centric</span>
+</div>
+</div>
+<div class="flex items-center gap-2 mt-2">
+<div class="px-2 py-1 rounded-lg bg-green-50 text-green-700 border border-green-200 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="trending_up">trending_up</span>
+<span class="font-label-sm text-label-sm font-bold">98</span>
+<span class="font-label-sm text-[10px] opacity-80">Viral Score</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Unselected Clip Card 1 -->
+<div class="bg-white rounded-2xl p-3 border border-outline-variant/30 hover:border-primary/50 transition-colors cursor-pointer group shadow-sm hover:shadow-md">
+<div class="flex gap-3">
+<div class="w-24 h-32 rounded-xl bg-[url('placeholder')] bg-cover bg-center overflow-hidden relative flex-shrink-0" data-alt="Thumbnail of a video showing a detailed close-up of a software interface on a laptop screen.">
+<div class="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors"></div>
+<span class="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/60 text-white font-label-sm text-[10px] backdrop-blur-sm">0:22</span>
+</div>
+<div class="flex flex-col justify-between py-1">
+<div>
+<h4 class="font-label-md text-label-md text-on-surface line-clamp-2">Feature Deep Dive: Dashboard UI</h4>
+<div class="flex flex-wrap gap-1 mt-2">
+<span class="px-2 py-0.5 rounded-full bg-tertiary-fixed text-on-tertiary-fixed font-label-sm text-[10px]">Informative</span>
+<span class="px-2 py-0.5 rounded-full bg-surface-variant text-on-surface-variant font-label-sm text-[10px]">Screen Rec</span>
+</div>
+</div>
+<div class="flex items-center gap-2 mt-2">
+<div class="px-2 py-1 rounded-lg bg-surface-variant text-on-surface-variant border border-outline-variant/20 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="analytics">analytics</span>
+<span class="font-label-sm text-label-sm font-bold">85</span>
+<span class="font-label-sm text-[10px] opacity-80">Viral Score</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Unselected Clip Card 2 -->
+<div class="bg-white rounded-2xl p-3 border border-outline-variant/30 hover:border-primary/50 transition-colors cursor-pointer group shadow-sm hover:shadow-md">
+<div class="flex gap-3">
+<div class="w-24 h-32 rounded-xl bg-[url('placeholder')] bg-cover bg-center overflow-hidden relative flex-shrink-0" data-alt="Thumbnail showing a person nodding and smiling, looking directly at the camera, wearing a headset.">
+<div class="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors"></div>
+<span class="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/60 text-white font-label-sm text-[10px] backdrop-blur-sm">0:10</span>
+</div>
+<div class="flex flex-col justify-between py-1">
+<div>
+<h4 class="font-label-md text-label-md text-on-surface line-clamp-2">Social Proof: Customer Testimonial</h4>
+<div class="flex flex-wrap gap-1 mt-2">
+<span class="px-2 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed font-label-sm text-[10px]">Trust</span>
+</div>
+</div>
+<div class="flex items-center gap-2 mt-2">
+<div class="px-2 py-1 rounded-lg bg-surface-variant text-on-surface-variant border border-outline-variant/20 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="analytics">analytics</span>
+<span class="font-label-sm text-label-sm font-bold">72</span>
+<span class="font-label-sm text-[10px] opacity-80">Viral Score</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Sticky Footer Action -->
+<div class="p-4 border-t border-outline-variant/20 bg-surface-container-lowest/90 backdrop-blur-sm">
+<button class="w-full py-3 rounded-xl bg-surface-container-high text-on-surface font-label-md text-label-md hover:bg-surface-variant transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+                    Generate More Clips
+                </button>
+</div>
+</div>
+</main>
+</body></html>
