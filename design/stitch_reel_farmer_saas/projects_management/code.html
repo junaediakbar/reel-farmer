@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Reel Farmer - Projects</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "outline": "#767586",
+                      "on-secondary-container": "#fffbff",
+                      "surface-container-highest": "#d3e4fe",
+                      "error": "#ba1a1a",
+                      "surface-tint": "#494bd6",
+                      "surface-container-high": "#dce9ff",
+                      "on-secondary-fixed-variant": "#6900b3",
+                      "on-tertiary-fixed": "#3d0026",
+                      "on-tertiary-fixed-variant": "#85145a",
+                      "secondary": "#8127cf",
+                      "outline-variant": "#c7c4d7",
+                      "inverse-on-surface": "#eaf1ff",
+                      "surface-bright": "#f8f9ff",
+                      "primary-fixed": "#e1e0ff",
+                      "on-secondary-fixed": "#2c0051",
+                      "surface-container-lowest": "#ffffff",
+                      "inverse-primary": "#c0c1ff",
+                      "primary-fixed-dim": "#c0c1ff",
+                      "surface-container": "#e5eeff",
+                      "on-tertiary-container": "#fffbff",
+                      "primary-container": "#6063ee",
+                      "on-primary": "#ffffff",
+                      "secondary-fixed": "#f0dbff",
+                      "on-surface": "#0b1c30",
+                      "surface-dim": "#cbdbf5",
+                      "on-tertiary": "#ffffff",
+                      "on-primary-container": "#fffbff",
+                      "primary": "#4648d4",
+                      "on-primary-fixed": "#07006c",
+                      "secondary-container": "#9c48ea",
+                      "on-error": "#ffffff",
+                      "tertiary-fixed": "#ffd8e7",
+                      "secondary-fixed-dim": "#ddb7ff",
+                      "on-error-container": "#93000a",
+                      "on-surface-variant": "#464554",
+                      "surface": "#f8f9ff",
+                      "error-container": "#ffdad6",
+                      "on-primary-fixed-variant": "#2f2ebe",
+                      "background": "#f8f9ff",
+                      "on-background": "#0b1c30",
+                      "surface-variant": "#d3e4fe",
+                      "surface-container-low": "#eff4ff",
+                      "tertiary": "#a12e70",
+                      "on-secondary": "#ffffff",
+                      "tertiary-container": "#c0488a",
+                      "tertiary-fixed-dim": "#ffafd3",
+                      "inverse-surface": "#213145"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "stack-md": "24px",
+                      "gutter": "24px",
+                      "margin-desktop": "64px",
+                      "stack-sm": "12px",
+                      "base": "8px",
+                      "stack-lg": "48px",
+                      "margin-mobile": "20px",
+                      "container-max": "1440px"
+              },
+              "fontFamily": {
+                      "headline-lg-mobile": [
+                              "Plus Jakarta Sans"
+                      ],
+                      "body-md": [
+                              "Plus Jakarta Sans"
+                      ],
+                      "label-sm": [
+                              "Plus Jakarta Sans"
+                      ],
+                      "headline-md": [
+                              "Plus Jakarta Sans"
+                      ],
+                      "headline-lg": [
+                              "Plus Jakarta Sans"
+                      ],
+                      "label-md": [
+                              "Plus Jakarta Sans"
+                      ],
+                      "body-lg": [
+                              "Plus Jakarta Sans"
+                      ],
+                      "display-lg": [
+                              "Plus Jakarta Sans"
+                      ]
+              },
+              "fontSize": {
+                      "headline-lg-mobile": [
+                              "28px",
+                              {
+                                      "lineHeight": "1.3",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "1.6",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "label-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "1",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "1.4",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "1.25",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "label-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "1",
+                                      "letterSpacing": "0.02em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "1.6",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "display-lg": [
+                              "48px",
+                              {
+                                      "lineHeight": "1.2",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "800"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+<style>
+        body {
+            background-color: #f8f9ff;
+            color: #0b1c30;
+        }
+        
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 10px 40px -10px rgba(99, 102, 241, 0.08);
+        }
+
+        .ambient-shadow {
+            box-shadow: 0 20px 50px -15px rgba(99, 102, 241, 0.12);
+        }
+
+        .inner-glow {
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 25px 50px -12px rgba(99, 102, 241, 0.15);
+        }
+    </style>
+</head>
+<body class="font-body-md text-body-md flex min-h-screen">
+<!-- SideNavBar -->
+<nav class="fixed left-0 top-0 h-full flex flex-col p-6 gap-stack-md bg-surface-container-lowest dark:bg-inverse-surface h-screen w-64 border-r border-outline-variant bg-surface-container-lowest shadow-sm z-50">
+<div class="flex flex-col gap-4">
+<div class="flex items-center gap-3 px-2">
+<div class="w-10 h-10 rounded-xl bg-primary-container flex items-center justify-center inner-glow">
+<span class="material-symbols-outlined text-on-primary-container">movie</span>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary text-xl">Reel Farmer</h1>
+<p class="font-label-sm text-label-sm text-on-surface-variant">AI Video Studio</p>
+</div>
+</div>
+<button class="mt-4 w-full py-3 px-4 rounded-xl bg-gradient-to-r from-primary to-secondary text-on-primary font-label-md text-label-md flex justify-center items-center gap-2 ambient-shadow hover:brightness-110 transition-all scale-95 active:scale-90 inner-glow">
+<span class="material-symbols-outlined text-[20px]">add</span>
+                Create New Run
+            </button>
+</div>
+<div class="flex-1 flex flex-col gap-2 mt-4">
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-surface-container-high transition-colors hover:text-on-surface" href="#">
+<span class="material-symbols-outlined">play_circle</span>
+<span class="font-label-md text-label-md">Runs</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary-container text-on-primary-container font-bold" href="#">
+<span class="material-symbols-outlined">folder</span>
+<span class="font-label-md text-label-md">Projects</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-surface-container-high transition-colors hover:text-on-surface" href="#">
+<span class="material-symbols-outlined">video_library</span>
+<span class="font-label-md text-label-md">Library</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-surface-container-high transition-colors hover:text-on-surface" href="#">
+<span class="material-symbols-outlined">auto_awesome_motion</span>
+<span class="font-label-md text-label-md">Templates</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-surface-container-high transition-colors hover:text-on-surface" href="#">
+<span class="material-symbols-outlined">payments</span>
+<span class="font-label-md text-label-md">Billing</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-surface-container-high transition-colors hover:text-on-surface" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</a>
+</div>
+<div class="mt-auto">
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-surface-container-high transition-colors hover:text-on-surface" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="font-label-md text-label-md">Help Center</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 ml-64 flex flex-col min-h-screen">
+<!-- TopAppBar -->
+<header class="flex items-center justify-between px-margin-desktop py-4 sticky top-0 z-40 bg-surface/70 dark:bg-background/70 backdrop-blur-xl w-full h-20 bg-transparent flat">
+<div class="flex-1 flex items-center">
+<h2 class="font-headline-md text-headline-md text-primary font-bold">Projects</h2>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative w-64 mr-4 hidden md:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="w-full h-12 pl-10 pr-4 bg-surface-bright border-none rounded-lg focus:ring-2 focus:ring-primary focus:bg-white inner-glow text-on-surface placeholder:text-outline transition-all" placeholder="Search projects..." type="text"/>
+</div>
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors cursor-pointer">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high hover:text-primary transition-colors cursor-pointer">
+<span class="material-symbols-outlined">mail</span>
+</button>
+<div class="w-10 h-10 rounded-full overflow-hidden ml-2 cursor-pointer border border-outline-variant">
+<img alt="User Avatar" class="w-full h-full object-cover" data-alt="A small circular avatar placeholder image showing a minimalistic abstract geometric shape in soft primary colors, suitable for a light-mode modern tech dashboard user profile picture." src="https://lh3.googleusercontent.com/aida-public/AB6AXuByhdcY-oTrvJY0ykEIGbkWdVIgHZcGkKcn9bhsKToUJJO4ygjhI7YmdcWwwLiXPsJibQZGqkEKRLan-IREHVRHn4sDjEmQIfMyxETKZ0idwZGanV_eLww5ed5j7UK1JgObslE9K2TAUtwl21AWMQ-37FVzAdhOMkVPpEYPeZdYpHwGYPkLcOV9oMsG6XCW-C4-17NBLc1yozAsJWbWYCQsecQfDIXQrPkkQQ-ug81ykje-LYdCS-o6"/>
+</div>
+</div>
+</header>
+<!-- Page Content -->
+<div class="flex-1 px-margin-desktop py-stack-md flex flex-col gap-stack-lg max-w-container-max mx-auto w-full">
+<!-- Header Section -->
+<div class="flex justify-between items-end">
+<div>
+<h3 class="font-headline-lg text-headline-lg text-on-surface mb-2">Your Workspaces</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Manage and organize your generated content across different channels.</p>
+</div>
+<button class="h-12 px-6 rounded-xl bg-white border border-outline-variant text-on-surface font-label-md text-label-md flex justify-center items-center gap-2 hover:bg-surface-container-lowest hover:border-primary hover:text-primary transition-all inner-glow shadow-sm">
+<span class="material-symbols-outlined text-[20px]">create_new_folder</span>
+                    New Project
+                </button>
+</div>
+<!-- Bento Grid / Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
+<!-- Project Card 1 -->
+<div class="glass-panel rounded-xl overflow-hidden flex flex-col card-hover transition-all duration-300">
+<div class="h-48 relative overflow-hidden">
+<img alt="Podcast Highlights Thumbnail" class="w-full h-full object-cover" data-alt="A modern, high-quality digital thumbnail representing a 'Podcast Highlights' category. The image features a sleek studio microphone in the foreground with soft, out-of-focus neon purple and blue lighting in the background, conveying a professional and contemporary audio-visual production vibe suitable for a clean tech UI." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCaYfc8KnOYCmfeheYRKEqOhIEO5qamRuo57tv1DbilwADxDHiEMtsrhdzgkt3pxQdfrYlx4EPhGJ8U9bU7IyKZQGvJoWLkh6D-vMXFvJMo3TDZN_dtyINenHsgGiHFxy4RErSmk3tJaly9kYiLBJQXdp33lZUvxgjY5qSf8NkiGnU2GtU34uV576ROmfWRb_6S7qmD4dWmrAJu26ySs-VphjDkxEQjTtnmhlPmdEHYh3cRODMBMHr-"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+<div class="absolute bottom-4 left-4 right-4 flex justify-between items-end">
+<div class="px-3 py-1 bg-surface-container-lowest/20 backdrop-blur-md rounded-full border border-white/30 text-white font-label-sm text-label-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">mic</span> Podcast Highlights
+                             </div>
+<div class="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center cursor-pointer hover:bg-white/40 transition-colors">
+<span class="material-symbols-outlined text-white text-[18px]">more_horiz</span>
+</div>
+</div>
+</div>
+<div class="p-6 flex flex-col gap-4">
+<div>
+<h4 class="font-headline-md text-headline-md text-on-surface text-xl mb-1">The Daily Tech Rundown</h4>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Main channel short-form content extraction.</p>
+</div>
+<div class="flex gap-4 pt-2">
+<div class="flex flex-col bg-surface-container-low p-3 rounded-lg flex-1 inner-glow">
+<span class="font-label-sm text-label-sm text-outline mb-1">Total Runs</span>
+<span class="font-headline-md text-headline-md text-primary text-lg">24</span>
+</div>
+<div class="flex flex-col bg-surface-container-low p-3 rounded-lg flex-1 inner-glow">
+<span class="font-label-sm text-label-sm text-outline mb-1">Clips Generated</span>
+<span class="font-headline-md text-headline-md text-secondary text-lg">156</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Project Card 2 -->
+<div class="glass-panel rounded-xl overflow-hidden flex flex-col card-hover transition-all duration-300">
+<div class="h-48 relative overflow-hidden">
+<img alt="Gaming Clips Thumbnail" class="w-full h-full object-cover" data-alt="A clean, vibrant digital thumbnail representing 'Gaming Clips'. The image showcases a high-end mechanical gaming keyboard and a glowing mouse on a dark desk, illuminated by soft cyan and magenta ambient lighting, capturing a premium, modern gaming aesthetic that fits a soft tech interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD7TK_bAYYcolTJGiTO-3aIDcp0m7IZWXPlzmY53YOvehhgBhvXQ4OR-tD-B6xNo-e0VuEIzmDEF73CBH9V_GDXnPqsf7Ho6Uw45IBlGp5JyDSCsR1gfE8gauN2UUEblb2J-EZzuycOR06xkSMLDgdxhL1cO6TdGA7Z-u9VgT7s0xJNYv_Jz8qdEewSaAan1Emsye6szKNTchiis5_28fGMMUuaYJz1YEXcKM2NSNMbLXVjOHctnvOv"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+<div class="absolute bottom-4 left-4 right-4 flex justify-between items-end">
+<div class="px-3 py-1 bg-surface-container-lowest/20 backdrop-blur-md rounded-full border border-white/30 text-white font-label-sm text-label-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">sports_esports</span> Gaming Shorts
+                             </div>
+<div class="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center cursor-pointer hover:bg-white/40 transition-colors">
+<span class="material-symbols-outlined text-white text-[18px]">more_horiz</span>
+</div>
+</div>
+</div>
+<div class="p-6 flex flex-col gap-4">
+<div>
+<h4 class="font-headline-md text-headline-md text-on-surface text-xl mb-1">Pro Playz Montage</h4>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Stream highlights and funny moments.</p>
+</div>
+<div class="flex gap-4 pt-2">
+<div class="flex flex-col bg-surface-container-low p-3 rounded-lg flex-1 inner-glow">
+<span class="font-label-sm text-label-sm text-outline mb-1">Total Runs</span>
+<span class="font-headline-md text-headline-md text-primary text-lg">42</span>
+</div>
+<div class="flex flex-col bg-surface-container-low p-3 rounded-lg flex-1 inner-glow">
+<span class="font-label-sm text-label-sm text-outline mb-1">Clips Generated</span>
+<span class="font-headline-md text-headline-md text-secondary text-lg">312</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Project Card 3 -->
+<div class="glass-panel rounded-xl overflow-hidden flex flex-col card-hover transition-all duration-300">
+<div class="h-48 relative overflow-hidden">
+<img alt="Tech Tutorials Thumbnail" class="w-full h-full object-cover" data-alt="A sleek, modern digital thumbnail representing 'Tech Tutorials'. The visual features lines of glowing code on a dark monitor screen next to a pair of premium wire-frame glasses resting on a pristine white desk, embodying a focused, clean educational aesthetic suitable for a high-end UI." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB41RtvuK4o2htQriwUoJsNw0PEy8gpd2lYHPRiohMnQqCQaWQQ_EJPiJ9RI7zSE1y9QAHS2ae42CqU5ecAiDwBU4xfWDAK3a6pCQatmczfhlxUCRXDb24VEPszYY1wQO7_Jj5tBkJFe5TbvegtriSzGe_4xrxnZFIp2CUIxFAFuMq8ZhAQ0gFqNK47zeVCEI5HYVxgqeHvrTKB2U9YUWqAwOMmW9u9fMCBWV71t_umAxBSzUMOO-4p"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+<div class="absolute bottom-4 left-4 right-4 flex justify-between items-end">
+<div class="px-3 py-1 bg-surface-container-lowest/20 backdrop-blur-md rounded-full border border-white/30 text-white font-label-sm text-label-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">school</span> Tech Tutorials
+                             </div>
+<div class="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center cursor-pointer hover:bg-white/40 transition-colors">
+<span class="material-symbols-outlined text-white text-[18px]">more_horiz</span>
+</div>
+</div>
+</div>
+<div class="p-6 flex flex-col gap-4">
+<div>
+<h4 class="font-headline-md text-headline-md text-on-surface text-xl mb-1">Code With AI</h4>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Educational snippets for social media.</p>
+</div>
+<div class="flex gap-4 pt-2">
+<div class="flex flex-col bg-surface-container-low p-3 rounded-lg flex-1 inner-glow">
+<span class="font-label-sm text-label-sm text-outline mb-1">Total Runs</span>
+<span class="font-headline-md text-headline-md text-primary text-lg">18</span>
+</div>
+<div class="flex flex-col bg-surface-container-low p-3 rounded-lg flex-1 inner-glow">
+<span class="font-label-sm text-label-sm text-outline mb-1">Clips Generated</span>
+<span class="font-headline-md text-headline-md text-secondary text-lg">84</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>
