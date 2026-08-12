@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { ClipTimeline } from "./ClipTimeline";
+import { Button } from "./components/ui/button";
 
 interface SourceVideoPlayerProps {
   runId: string;
@@ -13,28 +14,34 @@ export function SourceVideoPlayer({ runId, startSec, endSec, onChange }: SourceV
   const [duration, setDuration] = useState(0);
 
   return (
-    <section className="card source-video">
-      <video ref={videoRef} src={`/api/runs/${runId}/video`} controls onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)} />
+    <section className="soft-shadow flex flex-col gap-3 rounded-2xl bg-surface-container-lowest p-6">
+      <video
+        ref={videoRef}
+        src={`/api/runs/${runId}/video`}
+        controls
+        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+        className="w-full rounded-xl bg-black"
+      />
       <ClipTimeline durationSec={duration} startSec={startSec} endSec={endSec} onChange={onChange} />
-      <div className="clip-timeline-actions">
-        <button
-          type="button"
-          className="btn-ghost"
+      <div className="flex gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => {
             if (videoRef.current) videoRef.current.currentTime = startSec;
           }}
         >
           Preview start
-        </button>
-        <button
-          type="button"
-          className="btn-ghost"
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => {
             if (videoRef.current) videoRef.current.currentTime = endSec;
           }}
         >
           Preview end
-        </button>
+        </Button>
       </div>
     </section>
   );

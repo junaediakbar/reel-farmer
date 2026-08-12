@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { Button } from "./components/ui/button";
+import { Badge, type BadgeProps } from "./components/ui/badge";
 
 interface DepStatus {
   id: string;
@@ -16,11 +18,11 @@ interface InstallProgress {
   message?: string;
 }
 
-function badgeStatus(dep: DepStatus, phase: InstallProgress["phase"] | undefined): string {
-  if (dep.installed || phase === "done") return "completed";
-  if (phase === "failed") return "failed";
+function badgeVariant(dep: DepStatus, phase: InstallProgress["phase"] | undefined): BadgeProps["variant"] {
+  if (dep.installed || phase === "done") return "success";
+  if (phase === "failed") return "error";
   if (phase) return "running";
-  return "";
+  return "neutral";
 }
 
 /** First-run dependency wizard — shown only when yt-dlp/ffmpeg/whisper-cli/model aren't already reachable
@@ -79,52 +81,52 @@ export function Setup({ onReady }: { onReady: () => void }) {
   const anyFailed = statuses.some((d) => progress[d.id]?.phase === "failed");
 
   return (
-    <div className="app-shell">
-      <div className="main-area">
-        <div className="page">
-          <header className="page-header">
-            <h1>Setting up Reel Farmer</h1>
-            <p className="subtitle">A few tools are needed before the first run — about {totalMb} MB total.</p>
-          </header>
-
-          <div className="card setup-wizard">
-            {statuses.map((dep) => {
-              const p = progress[dep.id];
-              const phase = dep.installed ? "done" : p?.phase;
-              const pct = p?.bytesTotal ? Math.min(100, Math.round((100 * (p.bytesDownloaded ?? 0)) / p.bytesTotal)) : null;
-              return (
-                <div key={dep.id} className="dep-row">
-                  <div className="dep-row-main">
-                    <span>{dep.label}</span>
-                    <span className={`status-badge status-${badgeStatus(dep, phase)}`}>
-                      {dep.installed ? "ready" : (phase ?? `${dep.sizeEstimateMb} MB`)}
-                    </span>
-                  </div>
-                  {phase === "downloading" && pct !== null && (
-                    <div className="dep-progress-track">
-                      <div className="dep-progress-fill" style={{ width: `${pct}%` }} />
-                    </div>
-                  )}
-                  {!dep.installed && dep.manual && (
-                    <p className="run-stage">
-                      {dep.manual.reason} — see{" "}
-                      <a href={dep.manual.instructionsUrl} target="_blank" rel="noreferrer">
-                        install instructions
-                      </a>
-                      .
-                    </p>
-                  )}
-                  {phase === "failed" && p?.message && <p className="error-text">{p.message}</p>}
-                </div>
-              );
-            })}
-          </div>
-
-          {error && <p className="error-text">{error}</p>}
-          <button type="button" className="btn-primary" onClick={startInstall} disabled={installing}>
-            {installing ? "Installing…" : anyFailed ? "Retry failed" : "Install"}
-          </button>
+    <div className="relative flex min-h-screen items-center justify-center p-6">
+      <span className="pointer-events-none absolute left-1/2 top-0 h-72 w-72 -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
+      <div className="soft-shadow relative flex w-full max-w-lg flex-col gap-6 rounded-2xl bg-surface-container-lowest p-8">
+        <div className="flex flex-col gap-1 text-center">
+          <span className="inner-glow mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary-container">
+            <span className="material-symbols-outlined text-on-primary-container">download</span>
+          </span>
+          <h1 className="mt-3 text-headline-lg text-on-surface">Setting up Reel Farmer</h1>
+          <p className="text-on-surface-variant">A few tools are needed before the first run — about {totalMb} MB total.</p>
         </div>
+
+        <div className="flex flex-col gap-5">
+          {statuses.map((dep) => {
+            const p = progress[dep.id];
+            const phase = dep.installed ? "done" : p?.phase;
+            const pct = p?.bytesTotal ? Math.min(100, Math.round((100 * (p.bytesDownloaded ?? 0)) / p.bytesTotal)) : null;
+            return (
+              <div key={dep.id} className="flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-4 font-semibold">
+                  <span className="text-sm text-on-surface">{dep.label}</span>
+                  <Badge variant={badgeVariant(dep, phase)}>{dep.installed ? "ready" : (phase ?? `${dep.sizeEstimateMb} MB`)}</Badge>
+                </div>
+                {phase === "downloading" && pct !== null && (
+                  <div className="h-2 overflow-hidden rounded-full bg-surface-container">
+                    <div className="h-full rounded-full bg-gradient-to-r from-primary to-primary-bright transition-[width]" style={{ width: `${pct}%` }} />
+                  </div>
+                )}
+                {!dep.installed && dep.manual && (
+                  <p className="text-sm text-on-surface-variant">
+                    {dep.manual.reason} —{" "}
+                    <a href={dep.manual.instructionsUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                      install instructions
+                    </a>
+                    .
+                  </p>
+                )}
+                {phase === "failed" && p?.message && <p className="text-sm text-error">{p.message}</p>}
+              </div>
+            );
+          })}
+        </div>
+
+        {error && <p className="text-sm text-error">{error}</p>}
+        <Button variant="primary" onClick={startInstall} disabled={installing}>
+          {installing ? "Installing…" : anyFailed ? "Retry failed" : "Install"}
+        </Button>
       </div>
     </div>
   );

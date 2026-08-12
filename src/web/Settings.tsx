@@ -1,4 +1,8 @@
 import { useEffect, useState } from "react";
+import { Button } from "./components/ui/button";
+import { Input } from "./components/ui/input";
+import { Label } from "./components/ui/label";
+import { Badge } from "./components/ui/badge";
 
 interface LicenseStatus {
   valid: boolean;
@@ -16,6 +20,20 @@ interface DepStatus {
 interface DeepSeekKeyStatus {
   set: boolean;
   preview: string | null;
+}
+
+function SectionCard({ icon, title, children }: { icon: string; title: string; children: React.ReactNode }) {
+  return (
+    <section className="glass-panel flex flex-col gap-4 rounded-2xl p-8">
+      <div className="flex items-center gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <span className="material-symbols-outlined">{icon}</span>
+        </span>
+        <h2 className="text-headline-md text-on-surface">{title}</h2>
+      </div>
+      {children}
+    </section>
+  );
 }
 
 export function Settings() {
@@ -83,99 +101,82 @@ export function Settings() {
   }
 
   return (
-    <>
-      <header className="topbar">
-        <h2>Settings</h2>
+    <div className="flex flex-col">
+      <header className="sticky top-0 z-10 flex h-20 items-center bg-surface/70 px-6 backdrop-blur-xl">
+        <h2 className="text-headline-lg text-primary">Settings</h2>
       </header>
 
-      <div className="page">
-        <span className="blur-orb" style={{ width: 260, height: 260, top: -80, right: -60, background: "rgba(70,72,212,0.1)" }} />
-        <p className="subtitle">License, BYOK API key, and local dependency status.</p>
+      <div className="mx-auto flex w-full max-w-[1160px] flex-col gap-stack-md px-6 pb-24">
+        <p className="text-body-lg text-on-surface-variant">License, BYOK API key, and local dependency status.</p>
 
-        <div className="settings-grid">
-          <div className="settings-col">
-            <section className="glass-panel">
-              <div className="settings-section-header">
-                <span className="settings-section-icon">
-                  <span className="material-symbols-outlined">key</span>
-                </span>
-                <h2>License</h2>
-              </div>
-              <span className="plan-badge">BYOK · Flat device license</span>
-              {license?.mode === "disabled" && <p className="run-stage">No license server configured — running unrestricted.</p>}
-              {license?.mode === "live" && <p className="run-stage">Active.</p>}
-              {license?.mode === "grace" && (
-                <p className="run-stage">Offline grace period — {license.daysRemaining} day(s) remaining.</p>
+        <div className="grid grid-cols-1 items-start gap-gutter lg:grid-cols-[2fr_1fr]">
+          <div className="flex flex-col gap-gutter">
+            <SectionCard icon="key" title="License">
+              <Badge variant="secondary" className="w-fit">
+                BYOK · Flat device license
+              </Badge>
+              {license?.mode === "disabled" && (
+                <p className="text-sm text-on-surface-variant">No license server configured — running unrestricted.</p>
               )}
-              {license?.mode === "invalid" && <p className="error-text">{license.message ?? "License invalid."}</p>}
+              {license?.mode === "live" && <p className="text-sm text-on-surface-variant">Active.</p>}
+              {license?.mode === "grace" && (
+                <p className="text-sm text-on-surface-variant">Offline grace period — {license.daysRemaining} day(s) remaining.</p>
+              )}
+              {license?.mode === "invalid" && <p className="text-sm text-error">{license.message ?? "License invalid."}</p>}
 
               {license && license.mode !== "disabled" && license.mode !== "live" && (
-                <form onSubmit={activate}>
-                  <label>
+                <form onSubmit={activate} className="flex flex-col gap-3">
+                  <Label className="flex flex-col gap-2">
                     License key
-                    <input type="text" value={licenseKey} onChange={(e) => setLicenseKey(e.target.value)} disabled={activating} />
-                  </label>
-                  {error && <p className="error-text">{error}</p>}
-                  <button type="submit" className="btn-primary" disabled={activating || !licenseKey}>
+                    <Input type="text" value={licenseKey} onChange={(e) => setLicenseKey(e.target.value)} disabled={activating} />
+                  </Label>
+                  {error && <p className="text-sm text-error">{error}</p>}
+                  <Button type="submit" variant="primary" className="self-start" disabled={activating || !licenseKey}>
                     {activating ? "Activating…" : "Activate"}
-                  </button>
+                  </Button>
                 </form>
               )}
-            </section>
+            </SectionCard>
 
-            <section className="glass-panel">
-              <div className="settings-section-header">
-                <span className="settings-section-icon">
-                  <span className="material-symbols-outlined">vpn_key</span>
-                </span>
-                <h2>DeepSeek API key</h2>
-              </div>
-              <p className="run-stage">
+            <SectionCard icon="vpn_key" title="DeepSeek API key">
+              <p className="text-sm text-on-surface-variant">
                 Bring your own DeepSeek key — Reel Farmer never bills you for AI usage, it calls the API with your key.{" "}
                 {apiKeyStatus?.set ? `Current key: ${apiKeyStatus.preview}` : "No key configured yet."}
               </p>
-              <form onSubmit={saveApiKey}>
-                <label>
+              <form onSubmit={saveApiKey} className="flex flex-col gap-3">
+                <Label className="flex flex-col gap-2">
                   {apiKeyStatus?.set ? "Replace key" : "DeepSeek API key"}
-                  <input
+                  <Input
                     type="password"
                     placeholder="sk-…"
                     value={apiKeyInput}
                     onChange={(e) => setApiKeyInput(e.target.value)}
                     disabled={savingApiKey}
                   />
-                </label>
-                {apiKeyError && <p className="error-text">{apiKeyError}</p>}
-                <button type="submit" className="btn-primary" disabled={savingApiKey || !apiKeyInput}>
+                </Label>
+                {apiKeyError && <p className="text-sm text-error">{apiKeyError}</p>}
+                <Button type="submit" variant="primary" className="self-start" disabled={savingApiKey || !apiKeyInput}>
                   {savingApiKey ? "Saving…" : "Save key"}
-                </button>
+                </Button>
               </form>
-            </section>
+            </SectionCard>
           </div>
 
-          <div className="settings-col">
-            <section className="glass-panel">
-              <div className="settings-section-header">
-                <span className="settings-section-icon">
-                  <span className="material-symbols-outlined">terminal</span>
-                </span>
-                <h2>Local dependencies</h2>
-              </div>
+          <SectionCard icon="terminal" title="Local dependencies">
+            <div className="flex flex-col gap-3">
               {deps?.map((dep) => (
-                <div key={dep.id} className="dep-row-main">
-                  <span>{dep.label}</span>
-                  <span className={`status-badge status-${dep.installed ? "completed" : "failed"}`}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
-                      {dep.installed ? "check_circle" : "cancel"}
-                    </span>
+                <div key={dep.id} className="flex items-center justify-between gap-4 font-semibold">
+                  <span className="text-sm text-on-surface">{dep.label}</span>
+                  <Badge variant={dep.installed ? "success" : "error"}>
+                    <span className="material-symbols-outlined text-[14px]">{dep.installed ? "check_circle" : "cancel"}</span>
                     {dep.installed ? "ready" : "missing"}
-                  </span>
+                  </Badge>
                 </div>
               ))}
-            </section>
-          </div>
+            </div>
+          </SectionCard>
         </div>
       </div>
-    </>
+    </div>
   );
 }

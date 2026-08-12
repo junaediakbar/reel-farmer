@@ -41,11 +41,22 @@ export function ClipTimeline({ durationSec, startSec, endSec, onChange }: ClipTi
   const endPct = durationSec > 0 ? clampPct(endSec) : 100;
 
   return (
-    <div className="clip-timeline" ref={trackRef}>
-      <div className="clip-timeline-track" />
-      <div className="clip-timeline-selection" style={{ left: `${startPct}%`, width: `${Math.max(0, endPct - startPct)}%` }} />
-      <div className="clip-timeline-handle" style={{ left: `${startPct}%` }} onPointerDown={startDrag("start")} />
-      <div className="clip-timeline-handle" style={{ left: `${endPct}%` }} onPointerDown={startDrag("end")} />
+    <div className="relative mt-2 h-8" ref={trackRef}>
+      <div className="absolute inset-x-0 top-3 h-2 rounded-full bg-surface-container" />
+      <div
+        className="absolute top-3 h-2 rounded-full bg-gradient-to-r from-primary to-primary-bright"
+        style={{ left: `${startPct}%`, width: `${Math.max(0, endPct - startPct)}%` }}
+      />
+      <div
+        className="absolute top-1 -ml-3 h-6 w-6 cursor-ew-resize touch-none rounded-full border-2 border-primary bg-white"
+        style={{ left: `${startPct}%` }}
+        onPointerDown={startDrag("start")}
+      />
+      <div
+        className="absolute top-1 -ml-3 h-6 w-6 cursor-ew-resize touch-none rounded-full border-2 border-primary bg-white"
+        style={{ left: `${endPct}%` }}
+        onPointerDown={startDrag("end")}
+      />
     </div>
   );
 }

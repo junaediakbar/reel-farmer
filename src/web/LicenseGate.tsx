@@ -1,4 +1,7 @@
 import { useEffect, useState } from "react";
+import { Button } from "./components/ui/button";
+import { Input } from "./components/ui/input";
+import { Label } from "./components/ui/label";
 
 interface LicenseStatus {
   valid: boolean;
@@ -43,26 +46,28 @@ export function LicenseGate({ onReady }: { onReady: () => void }) {
   if (status === null || status.valid) return null;
 
   return (
-    <div className="app-shell">
-      <div className="main-area">
-        <div className="page">
-          <header className="page-header">
-            <h1>Activate Reel Farmer</h1>
-            <p className="subtitle">Enter your license key to continue.</p>
-          </header>
-
-          <form className="card" onSubmit={activate}>
-            <label>
-              License key
-              <input type="text" value={licenseKey} onChange={(e) => setLicenseKey(e.target.value)} disabled={activating} />
-            </label>
-            {status.message && <p className="error-text">{status.message}</p>}
-            {error && <p className="error-text">{error}</p>}
-            <button type="submit" className="btn-primary" disabled={activating || !licenseKey}>
-              {activating ? "Activating…" : "Activate"}
-            </button>
-          </form>
+    <div className="relative flex min-h-screen items-center justify-center p-6">
+      <span className="pointer-events-none absolute left-1/2 top-0 h-72 w-72 -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
+      <div className="soft-shadow relative flex w-full max-w-md flex-col gap-6 rounded-2xl bg-surface-container-lowest p-8">
+        <div className="flex flex-col gap-1 text-center">
+          <span className="inner-glow mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary-container">
+            <span className="material-symbols-outlined text-on-primary-container">movie</span>
+          </span>
+          <h1 className="mt-3 text-headline-lg text-on-surface">Activate Reel Farmer</h1>
+          <p className="text-on-surface-variant">Enter your license key to continue.</p>
         </div>
+
+        <form onSubmit={activate} className="flex flex-col gap-4">
+          <Label className="flex flex-col gap-2">
+            License key
+            <Input type="text" value={licenseKey} onChange={(e) => setLicenseKey(e.target.value)} disabled={activating} />
+          </Label>
+          {status.message && <p className="text-sm text-error">{status.message}</p>}
+          {error && <p className="text-sm text-error">{error}</p>}
+          <Button type="submit" variant="primary" disabled={activating || !licenseKey}>
+            {activating ? "Activating…" : "Activate"}
+          </Button>
+        </form>
       </div>
     </div>
   );
