@@ -98,7 +98,7 @@ async function processClip(
     await removeSilence(rawClipPath, silent, desilencedPath);
   });
 
-  const overlayPath = join(clipDir, "overlay.webm");
+  const overlayPath = join(clipDir, "overlay.mp4");
   await runStage("GENERATE_CAPTIONS", overlayPath, () => {
     const referenceText = transcript.segments
       .filter((s) => s.end > clip.startSec && s.start < clip.endSec)
@@ -285,7 +285,7 @@ export async function regenerateCaptionOverlay(
   const runDir = join(config.runsDir, runId);
   const clipDir = join(runDir, "clips", clipId);
   const desilencedPath = join(clipDir, "desilenced.mp4");
-  const overlayPath = join(clipDir, "overlay.webm");
+  const overlayPath = join(clipDir, "overlay.mp4");
 
   const downloadResult = await readJson<DownloadResult>(join(runDir, "download-result.json"));
   const clips = await readJson<ClipCandidate[]>(join(runDir, "clips.json"));

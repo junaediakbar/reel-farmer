@@ -43,7 +43,7 @@ export function groupWords(words: WordTimestamp[], groupSize: number = config.ca
   return groups;
 }
 
-/** Headless-renders the karaoke caption composition to a transparent WebM. Re-bundles per call. */
+/** Headless-renders the karaoke caption composition onto a solid chroma-key green MP4 (composer.ts keys it out). Re-bundles per call. */
 export async function renderCaptionOverlay(groups: CaptionGroup[], style: CaptionStyle, outPath: string): Promise<void> {
   const serveUrl = await bundle({ entryPoint: ENTRY_POINT });
   const inputProps = { groups, style };
@@ -51,9 +51,8 @@ export async function renderCaptionOverlay(groups: CaptionGroup[], style: Captio
   await renderMedia({
     composition,
     serveUrl,
-    codec: "vp8",
-    pixelFormat: "yuva420p",
-    imageFormat: "png",
+    codec: "h264",
+    pixelFormat: "yuv420p",
     outputLocation: outPath,
     inputProps,
   });
