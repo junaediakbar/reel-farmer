@@ -211,6 +211,26 @@ describe("processSelectedClips", () => {
     expect(clipsJson).toEqual(selected);
     cp.close();
   });
+
+  test("keeps unselected AI candidates in clips.json instead of dropping them", async () => {
+    clipsToReturn = fixtureClips(3);
+    const cp = new CheckpointManager(":memory:");
+    await runUntilSelection(cp, "https://youtube.com/watch?v=vid-1");
+    const runId = cp.listRuns()[0]!.id;
+    callLog.length = 0;
+
+    // First export: render just clip-0. clip-1/clip-2 were identified but not picked.
+    await processSelectedClips(cp, runId, [clipsToReturn[0]!]);
+    let clipsJson = (await Bun.file(join(config.runsDir, runId, "clips.json")).json()) as ClipCandidate[];
+    expect(clipsJson.map((c) => c.id).sort()).toEqual(["clip-0", "clip-1", "clip-2"]);
+
+    // Second export, later: render clip-1 too. clip-0 and clip-2 must still be there.
+    await processSelectedClips(cp, runId, [clipsToReturn[1]!]);
+    clipsJson = (await Bun.file(join(config.runsDir, runId, "clips.json")).json()) as ClipCandidate[];
+    expect(clipsJson.map((c) => c.id).sort()).toEqual(["clip-0", "clip-1", "clip-2"]);
+
+    cp.close();
+  });
 });
 
 describe("regenerateCaptionOverlay", () => {

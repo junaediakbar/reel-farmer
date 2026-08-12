@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { config } from "../config";
 import { log } from "../logger";
@@ -242,7 +242,15 @@ export async function processSelectedClips(
   const runDir = join(config.runsDir, runId);
   const downloadResult = await readJson<DownloadResult>(join(runDir, "download-result.json"));
   const transcript = await readJson<Transcript>(join(runDir, "transcript.json"));
-  await writeJson(join(runDir, "clips.json"), selectedClips);
+  // Merge into clips.json, don't overwrite it: selectedClips is just this export's picks, but
+  // clips.json is the durable record of every AI candidate + custom clip ever seen for this run —
+  // overwriting would permanently drop AI suggestions the user didn't render this round, making
+  // them unviewable and unrenderable later.
+  const clipsJsonPath = join(runDir, "clips.json");
+  const existingClips = existsSync(clipsJsonPath) ? await readJson<ClipCandidate[]>(clipsJsonPath) : [];
+  const byId = new Map(existingClips.map((c) => [c.id, c]));
+  for (const c of selectedClips) byId.set(c.id, c);
+  await writeJson(clipsJsonPath, [...byId.values()]);
 
   const resumable = checkpoint.getResumableState(runId);
   log("info", "processing selected clips", { runId, count: selectedClips.length });
