@@ -51,6 +51,7 @@ export function Sidebar({ onCreateRun }: { onCreateRun: () => void }) {
         {DISABLED_ITEMS.map((item) => (
           <span
             key={item.label}
+            title="Coming soon"
             className="flex cursor-not-allowed items-center gap-3 rounded-xl px-4 py-3 text-label-md text-on-surface-variant opacity-45"
           >
             <span className="material-symbols-outlined">{item.icon}</span>
@@ -59,7 +60,10 @@ export function Sidebar({ onCreateRun }: { onCreateRun: () => void }) {
         ))}
       </nav>
       <div className="mt-auto">
-        <span className="flex cursor-not-allowed items-center gap-3 rounded-xl px-4 py-3 text-label-md text-on-surface-variant opacity-45">
+        <span
+          title="Coming soon"
+          className="flex cursor-not-allowed items-center gap-3 rounded-xl px-4 py-3 text-label-md text-on-surface-variant opacity-45"
+        >
           <span className="material-symbols-outlined">help</span>
           Help Center
         </span>
