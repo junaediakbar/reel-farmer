@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CLIP_STAGES,
   GLOBAL_STAGES,
@@ -136,6 +136,7 @@ export function RunDetail({ runId, onBack, onDeleted, onOpenCaptions }: RunDetai
   const [sourceDuration, setSourceDuration] = useState(0);
   const [captionStyleName, setCaptionStyleName] = useState<string>(CAPTION_PRESET_NAMES[0]!);
   const [preProduction, setPreProduction] = useState<PreProductionOptions>({});
+  const scrubVideoRef = useRef<HTMLVideoElement>(null);
 
   async function refresh() {
     const res = await fetch(`/api/runs/${runId}`);
@@ -340,7 +341,13 @@ export function RunDetail({ runId, onBack, onDeleted, onOpenCaptions }: RunDetai
                     Clip {String(trimTargetIndex + 1).padStart(2, "0")} · {trimTarget.title}
                   </span>
                 </div>
-                <SourceVideoPlayer runId={runId} startSec={trimTarget.startSec} endSec={trimTarget.endSec} onDuration={setSourceDuration} />
+                <SourceVideoPlayer
+                  runId={runId}
+                  startSec={trimTarget.startSec}
+                  endSec={trimTarget.endSec}
+                  onDuration={setSourceDuration}
+                  videoRef={scrubVideoRef}
+                />
                 <div className="soft-shadow flex flex-col gap-3 rounded-2xl bg-surface-container-lowest p-4">
                   <h3 className="text-label-md text-on-surface-variant">Timeline Compilation</h3>
                   <ClipTimeline
@@ -349,6 +356,9 @@ export function RunDetail({ runId, onBack, onDeleted, onOpenCaptions }: RunDetai
                     activeId={trimTargetId}
                     onSelect={setTrimTargetId}
                     onChange={(id, startSec, endSec) => updateClip(id, { startSec, endSec })}
+                    onScrub={(sec) => {
+                      if (scrubVideoRef.current) scrubVideoRef.current.currentTime = sec;
+                    }}
                   />
                 </div>
                 <PreProductionPanel runId={runId} value={preProduction} onChange={setPreProduction} />

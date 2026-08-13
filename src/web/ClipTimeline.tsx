@@ -13,12 +13,15 @@ interface ClipTimelineProps {
   activeId: string | null;
   onSelect: (id: string) => void;
   onChange: (id: string, startSec: number, endSec: number) => void;
+  /** Fired with the dragged handle's position while dragging, so a parent can seek the source
+   * video for a live frame preview at the trim point. */
+  onScrub?: (sec: number) => void;
 }
 
 /** Overview track of every AI-identified clip positioned along the source video's duration. Only the active
  * clip exposes drag handles — dragging or clicking a segment keeps the trackpad and the AI Selections card in sync
  * via the shared activeId/onSelect state in RunDetail. Native Pointer Events, no drag library. */
-export function ClipTimeline({ durationSec, clips, activeId, onSelect, onChange }: ClipTimelineProps) {
+export function ClipTimeline({ durationSec, clips, activeId, onSelect, onChange, onScrub }: ClipTimelineProps) {
   const trackRef = useRef<HTMLDivElement>(null);
 
   function secAtClientX(clientX: number): number {
@@ -37,6 +40,7 @@ export function ClipTimeline({ durationSec, clips, activeId, onSelect, onChange 
         const sec = secAtClientX(ev.clientX);
         if (handle === "start") onChange(clip.id, Math.min(sec, clip.endSec - 0.5), clip.endSec);
         else onChange(clip.id, clip.startSec, Math.max(sec, clip.startSec + 0.5));
+        onScrub?.(sec);
       }
       function onUp() {
         window.removeEventListener("pointermove", onMove);

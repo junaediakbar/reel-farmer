@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, type RefObject } from "react";
 import { Button } from "./components/ui/button";
 
 interface SourceVideoPlayerProps {
@@ -6,10 +6,14 @@ interface SourceVideoPlayerProps {
   startSec: number;
   endSec: number;
   onDuration?: (durationSec: number) => void;
+  /** Lets a parent (e.g. RunDetail's trim trackpad) seek this same <video> while dragging, for a
+   * live frame preview at the trim point instead of only on click. */
+  videoRef?: RefObject<HTMLVideoElement>;
 }
 
-export function SourceVideoPlayer({ runId, startSec, endSec, onDuration }: SourceVideoPlayerProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
+export function SourceVideoPlayer({ runId, startSec, endSec, onDuration, videoRef: externalRef }: SourceVideoPlayerProps) {
+  const internalRef = useRef<HTMLVideoElement>(null);
+  const videoRef = externalRef ?? internalRef;
 
   return (
     <section className="soft-shadow flex flex-col gap-3 rounded-2xl bg-surface-container-lowest p-6">
