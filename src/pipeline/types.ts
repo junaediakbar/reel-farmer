@@ -22,6 +22,17 @@ export interface PipelineRun {
   errorMessage: string | null;
 }
 
+/** User-editable per-run knobs from the create-run form. Persisted to runDir/options.json so retries/resumes reuse the same choices. */
+export interface RunOptions {
+  contentType?: string;
+  /** Per-run override of the global AI provider (Settings) for IDENTIFY_CLIPS — unset means use the Settings choice. */
+  aiProvider?: "deepseek" | "nvidia";
+  language?: string;
+  clipCount?: number;
+  minDurationSec?: number;
+  maxDurationSec?: number;
+}
+
 export interface TokenUsage {
   promptTokens: number;
   completionTokens: number;
@@ -87,6 +98,9 @@ export interface CaptionGroup {
 export interface CaptionStyle {
   fontFamily: string;
   fontSize: number;
+  fontWeight: number;
+  lineHeight: number;
+  outline: boolean;
   primaryColor: string;
   activeColor: string;
   position: "bottom" | "center" | "top";
@@ -94,15 +108,57 @@ export interface CaptionStyle {
 }
 
 export const DEFAULT_CAPTION_STYLE: CaptionStyle = {
-  fontFamily: "Plus Jakarta Sans",
-  fontSize: 64,
+  fontFamily: "Arial",
+  fontSize: 52,
+  fontWeight: 800,
+  lineHeight: 1.1,
+  outline: true,
   primaryColor: "#ffffff",
-  activeColor: "#c0c1ff",
-  position: "bottom",
+  activeColor: "#FFD700",
+  position: "center",
   animate: true,
 };
+
+/** Splits a caption group's words into up to 2 fixed lines at the midpoint (short groups fall back
+ * to 1 line — line2 is empty). Matches the reference render style's layout. Shared by
+ * `CaptionOverlay.tsx` (export render) and `CaptionEditor.tsx` (live preview) on purpose — they
+ * must never compute this independently, or preview and export silently drift apart. */
+export function splitCaptionLines(words: WordTimestamp[]): [WordTimestamp[], WordTimestamp[]] {
+  const midpoint = Math.ceil(words.length / 2);
+  return [words.slice(0, midpoint), words.slice(midpoint)];
+}
+
+/** Shape persisted to captions.json — groups alongside the style they were rendered with, so reopening the editor restores both. */
+export interface CaptionsFile {
+  groups: CaptionGroup[];
+  style: CaptionStyle;
+}
 
 export interface SilentInterval {
   start: number;
   end: number;
+}
+
+export type WatermarkPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right" | "center";
+
+/** Wire/persisted shape — imageAsset is an opaque server-generated filename under runDir/assets,
+ * never a client-supplied path (see the upload endpoint in server.ts). */
+export interface WatermarkOptions {
+  imageAsset: string;
+  position: WatermarkPosition;
+  opacity: number;
+}
+
+export interface EndingWatermarkOptions extends WatermarkOptions {
+  /** Watermark shows only in the last N seconds of the clip. */
+  durationSec: number;
+}
+
+/** Pre-Production panel choices (PRD §1.5/§7.1, G19) — persisted to runDir/preproduction.json
+ * alongside style.json. Every field optional/off by default per PRD Principle #1. */
+export interface PreProductionOptions {
+  thumbnailAsset?: string;
+  thumbnailFrameSec?: number;
+  watermark?: WatermarkOptions;
+  endingWatermark?: EndingWatermarkOptions;
 }

@@ -1,19 +1,35 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ClipCandidate } from "../pipeline/types";
+import type { ClipCandidate, CaptionStyle, PreProductionOptions } from "../pipeline/types";
 
-const processSelectedClipsCalls: Array<{ runId: string; selectedClips: ClipCandidate[] }> = [];
+const processSelectedClipsCalls: Array<{
+  runId: string;
+  selectedClips: ClipCandidate[];
+  style?: CaptionStyle;
+  preProduction?: PreProductionOptions;
+}> = [];
 
 mock.module("../pipeline/orchestrator", () => ({
   runUntilSelection: mock(async () => {}),
-  processSelectedClips: mock(async (_cp: unknown, runId: string, selectedClips: ClipCandidate[]) => {
-    processSelectedClipsCalls.push({ runId, selectedClips });
-  }),
+  processSelectedClips: mock(
+    async (
+      _cp: unknown,
+      runId: string,
+      selectedClips: ClipCandidate[],
+      style?: CaptionStyle,
+      preProduction?: PreProductionOptions,
+    ) => {
+      processSelectedClipsCalls.push({ runId, selectedClips, style, preProduction });
+    },
+  ),
   regenerateCaptionOverlay: mock(async () => {}),
+  retranscribeCaptionOverlay: mock(async () => {}),
   finalClipPath: (outputDir: string, clip: ClipCandidate) => join(outputDir, `${clip.title}-${clip.id}.mp4`),
+  finalThumbnailPath: (outputDir: string, clip: ClipCandidate) => join(outputDir, `${clip.title}-${clip.id}.jpg`),
 }));
+
 
 
 const { createServer } = await import("./server");
@@ -65,6 +81,70 @@ describe("DELETE /api/runs/:id", () => {
     expect(checkpoint.getRun(run.id)).toBeNull();
     expect(existsSync(runDir)).toBe(false);
   });
+
+  test("removes only this run's own rendered clips, not a sibling run's sharing the same videoId", async () => {
+    // existingVideoId lets two runs share one downloaded video, hence one outputDir per videoId.
+    const clip: ClipCandidate = { id: "c1", title: "Clip", hookLine: "h", startSec: 0, endSec: 10, reason: "r", viralScore: 1, tags: [] };
+    const outputDir = join(config.outputDir, "vid-shared");
+    mkdirSync(outputDir, { recursive: true });
+    const outPath = join(outputDir, `${clip.title}-${clip.id}.mp4`);
+    await Bun.write(outPath, "rendered");
+
+    const runA = checkpoint.createRun("run-a", "vid-shared", "https://x", null);
+    const runADir = join(config.runsDir, runA.id);
+    mkdirSync(runADir, { recursive: true });
+    await Bun.write(join(runADir, "clips.json"), JSON.stringify([clip]));
+
+    const runB = checkpoint.createRun("run-b", "vid-shared", "https://x", null);
+    const runBDir = join(config.runsDir, runB.id);
+    mkdirSync(runBDir, { recursive: true });
+    // run B never rendered this clip — its clips.json is unrelated/empty.
+    await Bun.write(join(runBDir, "clips.json"), JSON.stringify([]));
+
+    const res = await fetch(`${baseUrl}/api/runs/${runB.id}`, { method: "DELETE" });
+    expect(res.status).toBe(200);
+
+    expect(checkpoint.getRun(runA.id)).not.toBeNull();
+    expect(existsSync(outPath)).toBe(true);
+
+    rmSync(runADir, { recursive: true, force: true });
+    rmSync(outputDir, { recursive: true, force: true });
+  });
+});
+
+describe("DELETE /api/runs/:id/clips/:clipId", () => {
+  test("without ?purge, deletes the render but keeps the candidate in clips.json", async () => {
+    const run = checkpoint.createRun("run-c", "vid-2", "https://x", null);
+    const runDir = join(config.runsDir, run.id);
+    mkdirSync(runDir, { recursive: true });
+    const clip: ClipCandidate = { id: "clip-a", title: "Clip A", hookLine: "h", startSec: 0, endSec: 10, reason: "r", viralScore: 1, tags: [] };
+    await Bun.write(join(runDir, "clips.json"), JSON.stringify([clip]));
+
+    const res = await fetch(`${baseUrl}/api/runs/${run.id}/clips/${clip.id}`, { method: "DELETE" });
+    expect(res.status).toBe(200);
+
+    const clipsJson = (await Bun.file(join(runDir, "clips.json")).json()) as ClipCandidate[];
+    expect(clipsJson.map((c) => c.id)).toEqual(["clip-a"]);
+
+    rmSync(runDir, { recursive: true, force: true });
+  });
+
+  test("with ?purge, also removes the candidate from clips.json so it can't reappear", async () => {
+    const run = checkpoint.createRun("run-d", "vid-3", "https://x", null);
+    const runDir = join(config.runsDir, run.id);
+    mkdirSync(runDir, { recursive: true });
+    const keep: ClipCandidate = { id: "clip-keep", title: "Keep", hookLine: "h", startSec: 0, endSec: 10, reason: "r", viralScore: 1, tags: [] };
+    const drop: ClipCandidate = { id: "clip-drop", title: "Drop", hookLine: "h", startSec: 10, endSec: 20, reason: "r", viralScore: 1, tags: [] };
+    await Bun.write(join(runDir, "clips.json"), JSON.stringify([keep, drop]));
+
+    const res = await fetch(`${baseUrl}/api/runs/${run.id}/clips/${drop.id}?purge=1`, { method: "DELETE" });
+    expect(res.status).toBe(200);
+
+    const clipsJson = (await Bun.file(join(runDir, "clips.json")).json()) as ClipCandidate[];
+    expect(clipsJson.map((c) => c.id)).toEqual(["clip-keep"]);
+
+    rmSync(runDir, { recursive: true, force: true });
+  });
 });
 
 describe("GET /api/runs/:id/video", () => {
@@ -90,19 +170,51 @@ describe("GET /api/runs/:id/video", () => {
 });
 
 describe("POST /api/runs/:id/select", () => {
-  test("triggers processSelectedClips with the posted clip list", async () => {
+  test("triggers processSelectedClips with the posted clip list and caption style", async () => {
     const run = checkpoint.createRun("run-select", "vid-1", "https://x", null);
     const selected: ClipCandidate[] = [
       { id: "c1", title: "Clip", hookLine: "hook", startSec: 0, endSec: 10, reason: "r", viralScore: 1, tags: [] },
     ];
+    const style = { fontFamily: "Arial", fontSize: 44, fontWeight: 500, lineHeight: 1.3, outline: false, primaryColor: "#ffffff", activeColor: "#ffffff", position: "bottom" as const, animate: false };
 
-    const res = await fetch(`${baseUrl}/api/runs/${run.id}/select`, { method: "POST", body: JSON.stringify(selected) });
+    const res = await fetch(`${baseUrl}/api/runs/${run.id}/select`, {
+      method: "POST",
+      body: JSON.stringify({ clips: selected, style }),
+    });
     expect(res.status).toBe(200);
 
     await new Promise((r) => setTimeout(r, 0)); // let the fire-and-forget call land
     expect(processSelectedClipsCalls).toHaveLength(1);
     expect(processSelectedClipsCalls[0]!.runId).toBe(run.id);
     expect(processSelectedClipsCalls[0]!.selectedClips).toEqual(selected);
+    expect(processSelectedClipsCalls[0]!.style).toEqual(style);
+  });
+
+  test("rejects an empty clip list", async () => {
+    const run = checkpoint.createRun("run-select-empty", "vid-1", "https://x", null);
+    const res = await fetch(`${baseUrl}/api/runs/${run.id}/select`, {
+      method: "POST",
+      body: JSON.stringify({ clips: [] }),
+    });
+    expect(res.status).toBe(400);
+    expect(processSelectedClipsCalls).toHaveLength(0);
+  });
+
+  test("passes preProduction through to processSelectedClips", async () => {
+    const run = checkpoint.createRun("run-select-preprod", "vid-1", "https://x", null);
+    const selected: ClipCandidate[] = [
+      { id: "c1", title: "Clip", hookLine: "hook", startSec: 0, endSec: 10, reason: "r", viralScore: 1, tags: [] },
+    ];
+    const preProduction = { watermark: { imageAsset: "logo.png", position: "bottom-right" as const, opacity: 0.8 } };
+
+    await fetch(`${baseUrl}/api/runs/${run.id}/select`, {
+      method: "POST",
+      body: JSON.stringify({ clips: selected, preProduction }),
+    });
+
+    await new Promise((r) => setTimeout(r, 0));
+    expect(processSelectedClipsCalls).toHaveLength(1);
+    expect(processSelectedClipsCalls[0]!.preProduction).toEqual(preProduction);
   });
 });
 
@@ -244,5 +356,177 @@ describe("GET/POST /api/settings/deepseek-key", () => {
   test("returns 400 when deepseekApiKey is missing", async () => {
     const res = await fetch(`${baseUrl}/api/settings/deepseek-key`, { method: "POST", body: JSON.stringify({}) });
     expect(res.status).toBe(400);
+  });
+});
+
+describe("GET/POST /api/settings/ai-provider", () => {
+  let testDir: string;
+  let originalSettingsPath: string;
+
+  beforeEach(() => {
+    originalSettingsPath = config.settingsPath;
+    testDir = mkdtempSync(join(tmpdir(), "reel-farmer-settings-test-"));
+    config.settingsPath = join(testDir, "settings.json");
+  });
+
+  afterEach(() => {
+    config.settingsPath = originalSettingsPath;
+    rmSync(testDir, { recursive: true, force: true });
+  });
+
+  test("defaults to deepseek, then switches to nvidia after saving", async () => {
+    const before = await fetch(`${baseUrl}/api/settings/ai-provider`);
+    expect(await before.json()).toEqual({ provider: "deepseek" });
+
+    const save = await fetch(`${baseUrl}/api/settings/ai-provider`, {
+      method: "POST",
+      body: JSON.stringify({ provider: "nvidia" }),
+    });
+    expect(save.status).toBe(200);
+
+    const after = await fetch(`${baseUrl}/api/settings/ai-provider`);
+    expect(await after.json()).toEqual({ provider: "nvidia" });
+  });
+
+  test("returns 400 for an unknown provider", async () => {
+    const res = await fetch(`${baseUrl}/api/settings/ai-provider`, {
+      method: "POST",
+      body: JSON.stringify({ provider: "openai" }),
+    });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("GET/POST /api/settings/:provider-model", () => {
+  let testDir: string;
+  let originalSettingsPath: string;
+  let originalDeepSeekModel: string | undefined;
+  let originalNvidiaModel: string | undefined;
+
+  beforeEach(() => {
+    originalSettingsPath = config.settingsPath;
+    originalDeepSeekModel = process.env.DEEPSEEK_MODEL;
+    originalNvidiaModel = process.env.NVIDIA_MODEL;
+    delete process.env.DEEPSEEK_MODEL;
+    delete process.env.NVIDIA_MODEL;
+    testDir = mkdtempSync(join(tmpdir(), "reel-farmer-settings-test-"));
+    config.settingsPath = join(testDir, "settings.json");
+  });
+
+  afterEach(() => {
+    config.settingsPath = originalSettingsPath;
+    if (originalDeepSeekModel === undefined) delete process.env.DEEPSEEK_MODEL;
+    else process.env.DEEPSEEK_MODEL = originalDeepSeekModel;
+    if (originalNvidiaModel === undefined) delete process.env.NVIDIA_MODEL;
+    else process.env.NVIDIA_MODEL = originalNvidiaModel;
+    rmSync(testDir, { recursive: true, force: true });
+  });
+
+  test("reports unset, then a saved model after POST", async () => {
+    const before = await fetch(`${baseUrl}/api/settings/deepseek-model`);
+    expect(await before.json()).toEqual({ set: false, model: null, history: [] });
+
+    const save = await fetch(`${baseUrl}/api/settings/deepseek-model`, {
+      method: "POST",
+      body: JSON.stringify({ model: "deepseek-chat" }),
+    });
+    expect(save.status).toBe(200);
+
+    const after = await fetch(`${baseUrl}/api/settings/deepseek-model`);
+    expect(await after.json()).toEqual({ set: true, model: "deepseek-chat", history: ["deepseek-chat"] });
+  });
+
+  test("records a recently-used history, most recent first and deduped", async () => {
+    await fetch(`${baseUrl}/api/settings/nvidia-model`, { method: "POST", body: JSON.stringify({ model: "meta/llama-3.1-405b-instruct" }) });
+    await fetch(`${baseUrl}/api/settings/nvidia-model`, { method: "POST", body: JSON.stringify({ model: "deepseek-ai/deepseek-r1" }) });
+    await fetch(`${baseUrl}/api/settings/nvidia-model`, { method: "POST", body: JSON.stringify({ model: "meta/llama-3.1-405b-instruct" }) });
+
+    const res = await fetch(`${baseUrl}/api/settings/nvidia-model`);
+    expect(await res.json()).toEqual({
+      set: true,
+      model: "meta/llama-3.1-405b-instruct",
+      history: ["meta/llama-3.1-405b-instruct", "deepseek-ai/deepseek-r1"],
+    });
+  });
+
+  test("returns 400 when model is missing or blank", async () => {
+    for (const body of [{}, { model: "" }, { model: "   " }]) {
+      const res = await fetch(`${baseUrl}/api/settings/nvidia-model`, { method: "POST", body: JSON.stringify(body) });
+      expect(res.status).toBe(400);
+    }
+  });
+
+  test("stores per-provider models independently", async () => {
+    await fetch(`${baseUrl}/api/settings/deepseek-model`, { method: "POST", body: JSON.stringify({ model: "deepseek-chat" }) });
+
+    const nvidia = await fetch(`${baseUrl}/api/settings/nvidia-model`);
+    expect(await nvidia.json()).toEqual({ set: false, model: null, history: [] });
+  });
+});
+
+describe("GET /api/settings/:provider-models", () => {
+  let testDir: string;
+  let originalSettingsPath: string;
+  let originalDeepSeekKey: string | undefined;
+
+  beforeEach(() => {
+    originalSettingsPath = config.settingsPath;
+    originalDeepSeekKey = process.env.DEEPSEEK_API_KEY;
+    delete process.env.DEEPSEEK_API_KEY;
+    testDir = mkdtempSync(join(tmpdir(), "reel-farmer-settings-test-"));
+    config.settingsPath = join(testDir, "settings.json");
+  });
+
+  afterEach(() => {
+    config.settingsPath = originalSettingsPath;
+    if (originalDeepSeekKey === undefined) delete process.env.DEEPSEEK_API_KEY;
+    else process.env.DEEPSEEK_API_KEY = originalDeepSeekKey;
+    rmSync(testDir, { recursive: true, force: true });
+  });
+
+  test("returns an empty list with a BYOK error instead of hitting the network when no key is set", async () => {
+    const res = await fetch(`${baseUrl}/api/settings/deepseek-models`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { models: string[]; error: string };
+    expect(body.models).toEqual([]);
+    expect(body.error).toMatch(/DEEPSEEK_API_KEY/);
+  });
+});
+
+describe("POST/GET /api/runs/:id/assets", () => {
+  test("uploads an image and serves it back", async () => {
+    const run = checkpoint.createRun("run-assets", "vid-1", "https://x", null);
+    const form = new FormData();
+    form.append("file", new Blob([new Uint8Array([1, 2, 3])], { type: "image/png" }), "logo.png");
+
+    const uploadRes = await fetch(`${baseUrl}/api/runs/${run.id}/assets`, { method: "POST", body: form });
+    expect(uploadRes.status).toBe(201);
+    const { asset } = (await uploadRes.json()) as { asset: string };
+    expect(asset).toMatch(/\.png$/);
+
+    const serveRes = await fetch(`${baseUrl}/api/runs/${run.id}/assets/${asset}`);
+    expect(serveRes.status).toBe(200);
+    expect(new Uint8Array(await serveRes.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
+  });
+
+  test("rejects a non-image upload", async () => {
+    const run = checkpoint.createRun("run-assets-badtype", "vid-1", "https://x", null);
+    const form = new FormData();
+    form.append("file", new Blob([new Uint8Array([1])], { type: "text/plain" }), "evil.txt");
+
+    const res = await fetch(`${baseUrl}/api/runs/${run.id}/assets`, { method: "POST", body: form });
+    expect(res.status).toBe(400);
+  });
+
+  test("refuses to serve a path-traversal filename", async () => {
+    const run = checkpoint.createRun("run-assets-traversal", "vid-1", "https://x", null);
+    // A real file that a broken basename()/containment check would actually be able to reach,
+    // sitting one level above assets/ — proves the guard, not just a missing directory.
+    const runDir = join(config.runsDir, run.id);
+    mkdirSync(join(runDir, "assets"), { recursive: true });
+    writeFileSync(join(runDir, "sentinel.txt"), "should never be served");
+
+    const res = await fetch(`${baseUrl}/api/runs/${run.id}/assets/${encodeURIComponent("../sentinel.txt")}`);
+    expect(res.status).toBe(404);
   });
 });

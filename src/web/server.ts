@@ -1,12 +1,33 @@
 #!/usr/bin/env bun
 import { existsSync, mkdirSync, rmSync } from "node:fs";
-import { join } from "node:path";
-import { config, dashboardAuthToken, deepSeekApiKeyStatus, saveDeepSeekApiKey } from "../config";
+import { basename, join, sep } from "node:path";
+import {
+  activeAiProvider,
+  aiModelHistory,
+  aiModelStatus,
+  config,
+  dashboardAuthToken,
+  deepSeekApiKeyStatus,
+  nvidiaApiKeyStatus,
+  saveAiModel,
+  saveDeepSeekApiKey,
+  saveNvidiaApiKey,
+  setActiveAiProvider,
+  type AiProvider,
+} from "../config";
 import { log } from "../logger";
 import { CheckpointManager } from "../pipeline/checkpoint";
-import { finalClipPath, processSelectedClips, regenerateCaptionOverlay, runUntilSelection } from "../pipeline/orchestrator";
+import {
+  finalClipPath,
+  finalThumbnailPath,
+  processSelectedClips,
+  regenerateCaptionOverlay,
+  retranscribeCaptionOverlay,
+  runUntilSelection,
+} from "../pipeline/orchestrator";
 import { checkStatus, installAll } from "../modules/dependency-installer";
 import { activateLicense, checkLicense } from "../modules/license";
+import { listAiModels } from "../modules/clip-identifier";
 import {
   CLIP_STAGES,
   GLOBAL_STAGES,
@@ -15,10 +36,19 @@ import {
   type ClipCandidate,
   type ClipProgress,
   type GlobalStage,
+  type PreProductionOptions,
+  type RunOptions,
   type TokenUsage,
 } from "../pipeline/types";
 import { serveVideoFile } from "./serveVideoFile";
 import homepage from "./index.html";
+
+/** MIME → stored extension allowlist for Pre-Production asset uploads (watermark/thumbnail images). */
+const ASSET_IMAGE_EXT: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+};
 
 function errMsg(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -26,6 +56,33 @@ function errMsg(err: unknown): string {
 
 function json(data: unknown, init?: ResponseInit): Response {
   return Response.json(data, init);
+}
+
+/** GET/POST pair for one provider's analysis model — Settings UI reads the current choice (plus recently-used models) and saves a new one. */
+function modelRoute(provider: AiProvider): Record<string, MethodHandler> {
+  return {
+    GET: () => json({ ...aiModelStatus(provider), history: aiModelHistory(provider) }),
+    POST: async (req) => {
+      const body = (await req.json().catch(() => ({}))) as { model?: string };
+      const model = body.model?.trim();
+      if (!model) return json({ error: "model is required" }, { status: 400 });
+      saveAiModel(provider, model);
+      return json({ ok: true });
+    },
+  };
+}
+
+/** GET of one provider's /models list for the Settings dropdown — empty list + error message (not a 500) when the key is missing/invalid so the UI can explain. */
+function modelsRoute(provider: AiProvider): Record<string, MethodHandler> {
+  return {
+    GET: async () => {
+      try {
+        return json({ models: await listAiModels(provider) });
+      } catch (err) {
+        return json({ models: [], error: errMsg(err) });
+      }
+    },
+  };
 }
 
 type MethodHandler = (req: Bun.BunRequest<string>) => Response | Promise<Response>;
@@ -38,8 +95,10 @@ function isAuthorized(req: Request): boolean {
 }
 
 /** Single auth checkpoint for every /api/* route (G2) — wraps each method handler once here rather than per-handler. */
-function withAuth(routes: Record<string, unknown>): Record<string, unknown> {
-  const wrapped: Record<string, unknown> = {};
+type RouteValue = Bun.HTMLBundle | Partial<Record<string, MethodHandler>>;
+
+function withAuth<T extends Record<string, RouteValue>>(routes: T): T {
+  const wrapped: Record<string, RouteValue> = {};
   for (const [path, entry] of Object.entries(routes)) {
     if (!path.startsWith("/api/") || typeof entry !== "object" || entry === null) {
       wrapped[path] = entry;
@@ -51,7 +110,7 @@ function withAuth(routes: Record<string, unknown>): Record<string, unknown> {
     }
     wrapped[path] = methods;
   }
-  return wrapped;
+  return wrapped as T;
 }
 
 interface DownloadResult {
@@ -145,6 +204,7 @@ export function createServer(checkpoint: CheckpointManager = new CheckpointManag
       "/runs": homepage,
       "/runs/new": homepage,
       "/runs/:id": homepage,
+      "/runs/:id/clips/:clipId/captions": homepage,
       "/library": homepage,
       "/settings": homepage,
       "/api/deps/status": {
@@ -189,6 +249,30 @@ export function createServer(checkpoint: CheckpointManager = new CheckpointManag
           return json({ ok: true });
         },
       },
+      "/api/settings/nvidia-key": {
+        GET: () => json(nvidiaApiKeyStatus()),
+        POST: async (req) => {
+          const body = (await req.json().catch(() => ({}))) as { nvidiaApiKey?: string };
+          if (!body.nvidiaApiKey) return json({ error: "nvidiaApiKey is required" }, { status: 400 });
+          saveNvidiaApiKey(body.nvidiaApiKey);
+          return json({ ok: true });
+        },
+      },
+      "/api/settings/ai-provider": {
+        GET: () => json({ provider: activeAiProvider() }),
+        POST: async (req) => {
+          const body = (await req.json().catch(() => ({}))) as { provider?: string };
+          if (body.provider !== "deepseek" && body.provider !== "nvidia") {
+            return json({ error: "provider must be 'deepseek' or 'nvidia'" }, { status: 400 });
+          }
+          setActiveAiProvider(body.provider);
+          return json({ ok: true });
+        },
+      },
+      "/api/settings/deepseek-model": modelRoute("deepseek"),
+      "/api/settings/nvidia-model": modelRoute("nvidia"),
+      "/api/settings/deepseek-models": modelsRoute("deepseek"),
+      "/api/settings/nvidia-models": modelsRoute("nvidia"),
       "/api/videos": {
         GET: async () => json(await listExistingDownloads(checkpoint)),
       },
@@ -199,13 +283,18 @@ export function createServer(checkpoint: CheckpointManager = new CheckpointManag
       "/api/runs": {
         GET: () => json(checkpoint.listRuns()),
         POST: async (req) => {
-          const body = (await req.json().catch(() => ({}))) as { youtubeUrl?: string; existingVideoId?: string };
+          const body = (await req.json().catch(() => ({}))) as {
+            youtubeUrl?: string;
+            existingVideoId?: string;
+            options?: RunOptions;
+          };
+          const options = body.options ?? {};
 
           if (body.existingVideoId) {
             const dl = (await listExistingDownloads(checkpoint)).find((v) => v.videoId === body.existingVideoId);
             if (!dl) return json({ error: "Unknown existingVideoId" }, { status: 404 });
             const { runId } = seedRunFromExistingDownload(checkpoint, dl);
-            runUntilSelection(checkpoint, dl.videoPath, runId).catch((err) =>
+            runUntilSelection(checkpoint, dl.videoPath, runId, options).catch((err) =>
               log("error", "background runUntilSelection failed", { runId, error: errMsg(err) }),
             );
             return json({ runId }, { status: 201 });
@@ -215,7 +304,7 @@ export function createServer(checkpoint: CheckpointManager = new CheckpointManag
           const runId = crypto.randomUUID();
           // Created synchronously so the client can poll /api/runs/:id immediately, no race with runUntilSelection's own creation.
           checkpoint.createRun(runId, "", body.youtubeUrl, null);
-          runUntilSelection(checkpoint, body.youtubeUrl, runId).catch((err) =>
+          runUntilSelection(checkpoint, body.youtubeUrl, runId, options).catch((err) =>
             log("error", "background runUntilSelection failed", { runId, error: errMsg(err) }),
           );
           return json({ runId }, { status: 201 });
@@ -224,7 +313,7 @@ export function createServer(checkpoint: CheckpointManager = new CheckpointManag
 
       "/api/runs/:id": {
         GET: async (req) => {
-          const run = checkpoint.getRun(req.params.id);
+          const run = checkpoint.getRun(req.params.id!);
           if (!run) return json({ error: "not found" }, { status: 404 });
           const clipsPath = join(config.runsDir, run.id, "clips.json");
           const clips = existsSync(clipsPath) ? ((await Bun.file(clipsPath).json()) as ClipCandidate[]) : [];
@@ -234,23 +323,36 @@ export function createServer(checkpoint: CheckpointManager = new CheckpointManag
             : null;
           return json({ run, clips, clipProgress: checkpoint.getClipProgress(run.id), tokenUsage });
         },
-        DELETE: (req) => {
-          const run = checkpoint.getRun(req.params.id);
+        DELETE: async (req) => {
+          const run = checkpoint.getRun(req.params.id!);
           if (!run) return json({ error: "not found" }, { status: 404 });
-          checkpoint.deleteRun(run.id);
           const runDir = join(config.runsDir, run.id);
-          if (existsSync(runDir)) rmSync(runDir, { recursive: true, force: true });
+
+          // outputDir is keyed by videoId, not runId — a video downloaded once can back multiple
+          // runs (existingVideoId), so only remove this run's own rendered files, never the whole dir.
           if (run.videoId) {
-            const outputDir = join(config.outputDir, run.videoId);
-            if (existsSync(outputDir)) rmSync(outputDir, { recursive: true, force: true });
+            const clipsPath = join(runDir, "clips.json");
+            if (existsSync(clipsPath)) {
+              const clips = (await Bun.file(clipsPath).json()) as ClipCandidate[];
+              const outputDir = join(config.outputDir, run.videoId);
+              for (const clip of clips) {
+                const outPath = finalClipPath(outputDir, clip);
+                if (existsSync(outPath)) rmSync(outPath, { force: true });
+                const thumbPath = finalThumbnailPath(outputDir, clip);
+                if (existsSync(thumbPath)) rmSync(thumbPath, { force: true });
+              }
+            }
           }
+
+          checkpoint.deleteRun(run.id);
+          if (existsSync(runDir)) rmSync(runDir, { recursive: true, force: true });
           return json({ ok: true });
         },
       },
 
       "/api/runs/:id/retry": {
         POST: async (req) => {
-          const run = checkpoint.getRun(req.params.id);
+          const run = checkpoint.getRun(req.params.id!);
           if (!run) return json({ error: "not found" }, { status: 404 });
           if (run.status !== "failed") return json({ error: "run is not failed" }, { status: 400 });
 
@@ -276,7 +378,7 @@ export function createServer(checkpoint: CheckpointManager = new CheckpointManag
 
       "/api/runs/:id/progress": {
         GET: (req) => {
-          const run = checkpoint.getRun(req.params.id);
+          const run = checkpoint.getRun(req.params.id!);
           if (!run) return json({ error: "not found" }, { status: 404 });
           return json({
             status: run.status,
@@ -289,19 +391,55 @@ export function createServer(checkpoint: CheckpointManager = new CheckpointManag
 
       "/api/runs/:id/select": {
         POST: async (req) => {
-          const run = checkpoint.getRun(req.params.id);
+          const run = checkpoint.getRun(req.params.id!);
           if (!run) return json({ error: "not found" }, { status: 404 });
-          const selectedClips = (await req.json()) as ClipCandidate[];
-          processSelectedClips(checkpoint, run.id, selectedClips).catch((err) =>
+          const body = (await req.json()) as {
+            clips: ClipCandidate[];
+            style?: CaptionStyle;
+            preProduction?: PreProductionOptions;
+          };
+          if (!Array.isArray(body.clips) || body.clips.length === 0) {
+            return json({ error: "clips must be a non-empty array" }, { status: 400 });
+          }
+          processSelectedClips(checkpoint, run.id, body.clips, body.style, body.preProduction).catch((err) =>
             log("error", "background processSelectedClips failed", { runId: run.id, error: errMsg(err) }),
           );
           return json({ ok: true });
         },
       },
 
+      // Pre-Production asset upload (watermark/ending-watermark/thumbnail images) — the server mints
+      // the stored filename so a client can never point compose at an arbitrary path (G: never trust
+      // a client-supplied path into ffmpeg or a file read).
+      "/api/runs/:id/assets": {
+        POST: async (req) => {
+          const run = checkpoint.getRun(req.params.id!);
+          if (!run) return json({ error: "not found" }, { status: 404 });
+          const form = await req.formData().catch(() => null);
+          const file = form?.get("file");
+          if (!(file instanceof Blob)) return json({ error: "file is required" }, { status: 400 });
+          const ext = ASSET_IMAGE_EXT[file.type];
+          if (!ext) return json({ error: "file must be PNG, JPEG, or WebP" }, { status: 400 });
+          const assetsDir = join(config.runsDir, run.id, "assets");
+          mkdirSync(assetsDir, { recursive: true });
+          const asset = `${crypto.randomUUID()}.${ext}`;
+          await Bun.write(join(assetsDir, asset), file);
+          return json({ asset }, { status: 201 });
+        },
+      },
+
+      "/api/runs/:id/assets/:name": {
+        GET: (req) => {
+          const assetsDir = join(config.runsDir, req.params.id!, "assets");
+          const path = join(assetsDir, basename(req.params.name!));
+          if (!path.startsWith(assetsDir + sep) || !existsSync(path)) return new Response("Not found", { status: 404 });
+          return new Response(Bun.file(path));
+        },
+      },
+
       "/api/runs/:id/video": {
         GET: async (req) => {
-          const dl = await readDownloadResult(req.params.id);
+          const dl = await readDownloadResult(req.params.id!);
           if (!dl) return new Response("Not found", { status: 404 });
           return serveVideoFile(dl.videoPath, req);
         },
@@ -309,12 +447,12 @@ export function createServer(checkpoint: CheckpointManager = new CheckpointManag
 
       "/api/runs/:id/clips/:clipId/video": {
         GET: async (req) => {
-          const dl = await readDownloadResult(req.params.id);
+          const dl = await readDownloadResult(req.params.id!);
           if (!dl) return new Response("Not found", { status: 404 });
-          const clipsPath = join(config.runsDir, req.params.id, "clips.json");
+          const clipsPath = join(config.runsDir, req.params.id!, "clips.json");
           if (!existsSync(clipsPath)) return new Response("Not found", { status: 404 });
           const clips = (await Bun.file(clipsPath).json()) as ClipCandidate[];
-          const clip = clips.find((c) => c.id === req.params.clipId);
+          const clip = clips.find((c) => c.id === req.params.clipId!);
           if (!clip) return new Response("Not found", { status: 404 });
           const path = finalClipPath(join(config.outputDir, dl.videoId), clip);
           if (!existsSync(path)) return new Response("Not found", { status: 404 });
@@ -322,9 +460,34 @@ export function createServer(checkpoint: CheckpointManager = new CheckpointManag
         },
       },
 
+      "/api/runs/:id/clips/:clipId/thumbnail": {
+        GET: async (req) => {
+          const dl = await readDownloadResult(req.params.id!);
+          if (!dl) return new Response("Not found", { status: 404 });
+          const clipsPath = join(config.runsDir, req.params.id!, "clips.json");
+          if (!existsSync(clipsPath)) return new Response("Not found", { status: 404 });
+          const clips = (await Bun.file(clipsPath).json()) as ClipCandidate[];
+          const clip = clips.find((c) => c.id === req.params.clipId!);
+          if (!clip) return new Response("Not found", { status: 404 });
+          const path = finalThumbnailPath(join(config.outputDir, dl.videoId), clip);
+          if (!existsSync(path)) return new Response("Not found", { status: 404 });
+          return new Response(Bun.file(path));
+        },
+      },
+
+      // Pre-caption footage (post REMOVE_SILENCE, before COMPOSE_REEL) — lets the caption editor
+      // preview a style live without the old burned-in overlay showing underneath it.
+      "/api/runs/:id/clips/:clipId/desilenced": {
+        GET: async (req) => {
+          const path = join(config.runsDir, req.params.id!, "clips", req.params.clipId!, "desilenced.mp4");
+          if (!existsSync(path)) return new Response("Not found", { status: 404 });
+          return serveVideoFile(path, req);
+        },
+      },
+
       "/api/runs/:id/clips/:clipId/captions": {
         GET: async (req) => {
-          const path = join(config.runsDir, req.params.id, "clips", req.params.clipId, "captions.json");
+          const path = join(config.runsDir, req.params.id!, "clips", req.params.clipId!, "captions.json");
           if (!existsSync(path)) return json({ error: "not found" }, { status: 404 });
           return json(await Bun.file(path).json());
         },
@@ -334,10 +497,23 @@ export function createServer(checkpoint: CheckpointManager = new CheckpointManag
         POST: async (req) => {
           const body = (await req.json()) as { groups: CaptionGroup[]; style?: CaptionStyle };
           try {
-            await regenerateCaptionOverlay(checkpoint, req.params.id, req.params.clipId, body.groups, body.style);
+            await regenerateCaptionOverlay(checkpoint, req.params.id!, req.params.clipId!, body.groups, body.style);
             return json({ ok: true });
           } catch (err) {
-            log("error", "regenerate captions failed", { runId: req.params.id, clipId: req.params.clipId, error: errMsg(err) });
+            log("error", "regenerate captions failed", { runId: req.params.id!, clipId: req.params.clipId!, error: errMsg(err) });
+            return json({ error: errMsg(err) }, { status: 500 });
+          }
+        },
+      },
+
+      "/api/runs/:id/clips/:clipId/captions/retranscribe": {
+        POST: async (req) => {
+          const body = (await req.json()) as { language: string; style?: CaptionStyle };
+          try {
+            await retranscribeCaptionOverlay(checkpoint, req.params.id!, req.params.clipId!, body.language, body.style);
+            return json({ ok: true });
+          } catch (err) {
+            log("error", "retranscribe captions failed", { runId: req.params.id!, clipId: req.params.clipId!, error: errMsg(err) });
             return json({ error: errMsg(err) }, { status: 500 });
           }
         },
@@ -346,18 +522,28 @@ export function createServer(checkpoint: CheckpointManager = new CheckpointManag
       "/api/runs/:id/clips/:clipId": {
         DELETE: async (req) => {
           const { id: runId, clipId } = req.params;
-          const clipDir = join(config.runsDir, runId, "clips", clipId);
+          const purge = new URL(req.url).searchParams.has("purge");
+          const clipDir = join(config.runsDir, runId!, "clips", clipId!);
           if (existsSync(clipDir)) rmSync(clipDir, { recursive: true, force: true });
-          checkpoint.deleteClipProgress(runId, clipId);
+          checkpoint.deleteClipProgress(runId!, clipId!);
 
-          const run = checkpoint.getRun(runId);
-          const clipsPath = join(config.runsDir, runId, "clips.json");
+          const run = checkpoint.getRun(runId!);
+          const clipsPath = join(config.runsDir, runId!, "clips.json");
           if (run?.videoId && existsSync(clipsPath)) {
             const clips = (await Bun.file(clipsPath).json()) as ClipCandidate[];
-            const clip = clips.find((c) => c.id === clipId);
+            const clip = clips.find((c) => c.id === clipId!);
             if (clip) {
-              const outPath = finalClipPath(join(config.outputDir, run.videoId), clip);
+              const outputDir = join(config.outputDir, run.videoId);
+              const outPath = finalClipPath(outputDir, clip);
               if (existsSync(outPath)) rmSync(outPath, { force: true });
+              const thumbPath = finalThumbnailPath(outputDir, clip);
+              if (existsSync(thumbPath)) rmSync(thumbPath, { force: true });
+            }
+            // "Remove" (not just "delete render") also drops the candidate itself, AI-identified
+            // or custom, so it stops reappearing in the review UI on refresh — a real backend
+            // delete, not just local frontend state (G: previously "Remove" never told the server).
+            if (purge) {
+              await Bun.write(clipsPath, JSON.stringify(clips.filter((c) => c.id !== clipId)));
             }
           }
           return json({ ok: true });

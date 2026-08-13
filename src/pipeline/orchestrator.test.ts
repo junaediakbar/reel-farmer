@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import type { CaptionGroup, ClipCandidate, Transcript } from "./types";
+import { DEFAULT_CAPTION_STYLE, type CaptionGroup, type CaptionStyle, type ClipCandidate, type Transcript } from "./types";
 // Statically imported (before any mock.module call below) so these bindings are the real
 // implementations — used to spread the non-mocked exports back in, since mock.module replaces
 // the whole module for every importer in this test process, including the modules' own *.test.ts.
 import * as RealClipIdentifier from "../modules/clip-identifier";
 import * as RealSilenceRemover from "../modules/silence-remover";
 import * as RealCaptionGenerator from "../modules/caption-generator";
+import * as RealComposer from "../modules/composer";
 
 const callLog: string[] = [];
 let activeExtracts = 0;
@@ -76,8 +77,10 @@ mock.module("../modules/silence-remover", () => ({
 
 mock.module("../modules/caption-generator", () => ({
   ...RealCaptionGenerator,
-  generateCaptions: mock(async () => {
+  generateCaptions: mock(async (_audio: string, clipDir: string, _ref: string, _out: string, style: CaptionStyle) => {
     callLog.push("caption");
+    const groups: CaptionGroup[] = [{ words: [{ word: "hi", start: 0, end: 0.5 }], start: 0, end: 0.5 }];
+    await Bun.write(join(clipDir, "captions.json"), JSON.stringify({ groups, style }));
   }),
   renderCaptionOverlay: mock(async () => {
     callLog.push("regen-caption");
@@ -85,6 +88,7 @@ mock.module("../modules/caption-generator", () => ({
 }));
 
 mock.module("../modules/composer", () => ({
+  ...RealComposer,
   composeReel: mock(async () => {
     callLog.push("compose");
   }),
@@ -231,6 +235,57 @@ describe("processSelectedClips", () => {
 
     cp.close();
   });
+
+  test("re-renders overlay + compose (no Whisper) when re-selecting with a different style", async () => {
+    const cp = new CheckpointManager(":memory:");
+    await runUntilSelection(cp, "https://youtube.com/watch?v=vid-1");
+    const runId = cp.listRuns()[0]!.id;
+    await processSelectedClips(cp, runId, fixtureClips(1));
+    callLog.length = 0;
+
+    const differentStyle: CaptionStyle = { ...DEFAULT_CAPTION_STYLE, fontSize: 44, position: "center" };
+    await processSelectedClips(cp, runId, fixtureClips(1), differentStyle);
+
+    expect(callLog).toEqual(["regen-caption", "compose"]);
+    expect(cp.getRun(runId)!.status).toBe("completed");
+    const captionsJson = await Bun.file(join(config.runsDir, runId, "clips", "clip-0", "captions.json")).json();
+    expect(captionsJson.style).toEqual(differentStyle);
+    cp.close();
+  });
+
+  test("re-renders overlay + compose when re-selecting with different pre-production choices", async () => {
+    const cp = new CheckpointManager(":memory:");
+    await runUntilSelection(cp, "https://youtube.com/watch?v=vid-1");
+    const runId = cp.listRuns()[0]!.id;
+    await processSelectedClips(cp, runId, fixtureClips(1));
+    callLog.length = 0;
+
+    // Without this staleness check, re-selecting the same clips after only toggling on a
+    // watermark would look identical to the checkpoint (all 4 stages already "completed") and
+    // silently skip re-rendering — the exported video would never actually gain the watermark.
+    await processSelectedClips(cp, runId, fixtureClips(1), undefined, {
+      watermark: { imageAsset: "logo.png", position: "bottom-right", opacity: 0.8 },
+    });
+
+    expect(callLog).toEqual(["regen-caption", "compose"]);
+    expect(cp.getRun(runId)!.status).toBe("completed");
+    const preproduction = await Bun.file(join(config.runsDir, runId, "preproduction.json")).json();
+    expect(preproduction.watermark.imageAsset).toBe("logo.png");
+    cp.close();
+  });
+
+  test("re-selecting with the same style is a no-op", async () => {
+    const cp = new CheckpointManager(":memory:");
+    await runUntilSelection(cp, "https://youtube.com/watch?v=vid-1");
+    const runId = cp.listRuns()[0]!.id;
+    await processSelectedClips(cp, runId, fixtureClips(1));
+    callLog.length = 0;
+
+    await processSelectedClips(cp, runId, fixtureClips(1));
+
+    expect(callLog).toEqual([]);
+    cp.close();
+  });
 });
 
 describe("regenerateCaptionOverlay", () => {
@@ -254,7 +309,7 @@ describe("regenerateCaptionOverlay", () => {
     expect(progress.find((p) => p.stage === "COMPOSE_REEL")?.status).toBe("completed");
 
     const captionsJson = await Bun.file(join(config.runsDir, runId, "clips", "clip-0", "captions.json")).json();
-    expect(captionsJson).toEqual(editedGroups);
+    expect(captionsJson).toEqual({ groups: editedGroups, style: DEFAULT_CAPTION_STYLE });
     cp.close();
   });
 });

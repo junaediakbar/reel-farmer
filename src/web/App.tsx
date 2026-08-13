@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useNavigate, useParams } from "react-router";
 import { useAtom } from "jotai";
 import { runsAtom, existingVideosAtom, licenseValidAtom, depsReadyAtom } from "./atoms";
 import { RunDetail } from "./RunDetail";
+import { CaptionEditor } from "./CaptionEditor";
 import { LicenseGate } from "./LicenseGate";
 import { Setup } from "./Setup";
 import { Sidebar } from "./Sidebar";
@@ -15,7 +16,21 @@ function RunDetailRoute() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   if (!id) return <Navigate to="/runs" replace />;
-  return <RunDetail runId={id} onBack={() => navigate("/runs")} onDeleted={() => navigate("/runs")} />;
+  return (
+    <RunDetail
+      runId={id}
+      onBack={() => navigate("/runs")}
+      onDeleted={() => navigate("/runs")}
+      onOpenCaptions={(clipId) => navigate(`/runs/${id}/clips/${clipId}/captions`)}
+    />
+  );
+}
+
+function CaptionEditorRoute() {
+  const { id, clipId } = useParams<{ id: string; clipId: string }>();
+  const navigate = useNavigate();
+  if (!id || !clipId) return <Navigate to="/runs" replace />;
+  return <CaptionEditor runId={id} clipId={clipId} onBack={() => navigate(`/runs/${id}`)} />;
 }
 
 export function App() {
@@ -50,6 +65,7 @@ export function App() {
           <Route path="/runs" element={<RunsPage />} />
           <Route path="/runs/new" element={<CreateRunPage />} />
           <Route path="/runs/:id" element={<RunDetailRoute />} />
+          <Route path="/runs/:id/clips/:clipId/captions" element={<CaptionEditorRoute />} />
           <Route path="/library" element={<Library />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/runs" replace />} />

@@ -31,3 +31,14 @@ export async function runCommandOrThrow(cmd: string[], opts: { cwd?: string } = 
   }
   return result;
 }
+
+/** Parses "Duration: HH:MM:SS.cc" out of `ffmpeg -i <path>`'s stderr — ffmpeg always reports it when
+ * given an input with no output. Avoids depending on ffprobe, which isn't a managed binary (only
+ * yt-dlp/ffmpeg/whisper-cli are downloaded, see bin-paths.ts) and so may not exist in a packaged install. */
+export async function getVideoDurationSec(path: string): Promise<number> {
+  const result = await runCommand(["ffmpeg", "-i", path]);
+  const match = /Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(result.stderr);
+  if (!match) throw new Error(`Could not read duration from ${path}`);
+  const [, h, m, s] = match;
+  return Number(h) * 3600 + Number(m) * 60 + Number(s);
+}

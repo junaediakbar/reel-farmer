@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router";
 import { Input } from "./components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
 import { Badge } from "./components/ui/badge";
@@ -27,6 +28,7 @@ function timeAgo(iso: string): string {
 }
 
 export function Library() {
+  const navigate = useNavigate();
   const [clips, setClips] = useState<RenderedClip[] | null>(null);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortMode>("recent");
@@ -109,10 +111,16 @@ export function Library() {
                     </Badge>
                   ))}
                 </div>
-                <Button variant="ghost" size="sm" className="self-start" onClick={() => deleteClip(clip)}>
-                  <span className="material-symbols-outlined text-[16px]">delete</span>
-                  Delete
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => navigate(`/runs/${clip.runId}/clips/${clip.clipId}/captions`)}>
+                    <span className="material-symbols-outlined text-[16px]">edit</span>
+                    Edit captions
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => deleteClip(clip)}>
+                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                    Delete
+                  </Button>
+                </div>
               </div>
             </article>
           ))}

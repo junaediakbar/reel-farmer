@@ -1,17 +1,15 @@
-import { useRef, useState } from "react";
-import { ClipTimeline } from "./ClipTimeline";
+import { useRef } from "react";
 import { Button } from "./components/ui/button";
 
 interface SourceVideoPlayerProps {
   runId: string;
   startSec: number;
   endSec: number;
-  onChange: (startSec: number, endSec: number) => void;
+  onDuration?: (durationSec: number) => void;
 }
 
-export function SourceVideoPlayer({ runId, startSec, endSec, onChange }: SourceVideoPlayerProps) {
+export function SourceVideoPlayer({ runId, startSec, endSec, onDuration }: SourceVideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [duration, setDuration] = useState(0);
 
   return (
     <section className="soft-shadow flex flex-col gap-3 rounded-2xl bg-surface-container-lowest p-6">
@@ -19,10 +17,9 @@ export function SourceVideoPlayer({ runId, startSec, endSec, onChange }: SourceV
         ref={videoRef}
         src={`/api/runs/${runId}/video`}
         controls
-        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+        onLoadedMetadata={(e) => onDuration?.(e.currentTarget.duration)}
         className="w-full rounded-xl bg-black"
       />
-      <ClipTimeline durationSec={duration} startSec={startSec} endSec={endSec} onChange={onChange} />
       <div className="flex gap-2">
         <Button
           variant="ghost"

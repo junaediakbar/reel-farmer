@@ -64,7 +64,7 @@ interface WhisperJson {
   }>;
 }
 
-async function runWhisperCli(audioPath: string, outBase: string, extraArgs: string[]): Promise<WhisperJson> {
+async function runWhisperCli(audioPath: string, outBase: string, extraArgs: string[], language: string = config.whisperLanguage): Promise<WhisperJson> {
   const model = requireWhisperModel();
   await runCommandOrThrow([
     "whisper-cli",
@@ -73,7 +73,7 @@ async function runWhisperCli(audioPath: string, outBase: string, extraArgs: stri
     "-f",
     audioPath,
     "-l",
-    config.whisperLanguage,
+    language,
     "-oj",
     "-of",
     outBase,
@@ -83,8 +83,8 @@ async function runWhisperCli(audioPath: string, outBase: string, extraArgs: stri
 }
 
 /** Segment-level transcript — used as the TRANSCRIBE stage fallback when no YouTube captions exist. */
-export async function transcribeWithWhisper(audioPath: string, outBase: string): Promise<TranscriptSegment[]> {
-  const json = await runWhisperCli(audioPath, outBase, []);
+export async function transcribeWithWhisper(audioPath: string, outBase: string, language?: string): Promise<TranscriptSegment[]> {
+  const json = await runWhisperCli(audioPath, outBase, [], language);
   return json.transcription.map((seg) => ({
     text: seg.text.trim(),
     start: seg.offsets.from / 1000,
@@ -93,8 +93,8 @@ export async function transcribeWithWhisper(audioPath: string, outBase: string):
 }
 
 /** Word-level timestamps (`-ml 1 -sow`) — used by GENERATE_CAPTIONS regardless of how TRANSCRIBE got its text. */
-export async function transcribeWordsWithWhisper(audioPath: string, outBase: string): Promise<WordTimestamp[]> {
-  const json = await runWhisperCli(audioPath, outBase, ["-ml", "1", "-sow"]);
+export async function transcribeWordsWithWhisper(audioPath: string, outBase: string, language?: string): Promise<WordTimestamp[]> {
+  const json = await runWhisperCli(audioPath, outBase, ["-ml", "1", "-sow"], language);
   return json.transcription
     .map((seg) => ({
       word: seg.text.trim(),
@@ -109,6 +109,7 @@ export async function getTranscript(
   runDir: string,
   videoPath: string,
   subtitlePath: string | null,
+  language?: string,
 ): Promise<Transcript> {
   if (config.preferYouTubeTranscripts && subtitlePath) {
     const content = await Bun.file(subtitlePath).text();
@@ -118,6 +119,6 @@ export async function getTranscript(
 
   const audioPath = join(runDir, "audio.wav");
   await extractAudioWav(videoPath, audioPath);
-  const segments = await transcribeWithWhisper(audioPath, join(runDir, "transcript"));
+  const segments = await transcribeWithWhisper(audioPath, join(runDir, "transcript"), language);
   return { source: "whisper", segments };
 }

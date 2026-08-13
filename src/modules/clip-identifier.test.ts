@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { callDeepSeek, filterAndSortCandidates, parseClipCandidates } from "./clip-identifier";
+import { callDeepSeek, callNvidia, filterAndSortCandidates, listAiModels, parseClipCandidates } from "./clip-identifier";
 
 beforeEach(() => {
   process.env.DEEPSEEK_API_KEY = "test-key";
+  process.env.NVIDIA_API_KEY = "test-key";
+  process.env.DEEPSEEK_MODEL = "deepseek-chat";
+  process.env.NVIDIA_MODEL = "deepseek-ai/deepseek-v3.1";
 });
 
 describe("parseClipCandidates", () => {
@@ -36,18 +39,25 @@ describe("filterAndSortCandidates", () => {
     return { title: "t", hookLine: "h", start, end, reason: "r", viralScore, tags: [] };
   }
 
-  test("keeps only clips within the 15-120s window and video bounds", () => {
+  test("clamps candidates into the duration window instead of dropping them", () => {
     const candidates = filterAndSortCandidates(
       [
-        raw(0, 10, 50), // too short
-        raw(0, 30, 90), // ok
-        raw(0, 200, 99), // too long
-        raw(90, 130, 70), // exceeds duration (100)
+        raw(0, 10, 50), // too short (10s) -> extended to the 15s minimum
+        raw(0, 30, 90), // already within bounds -> unchanged
+        raw(0, 300, 99), // too long (300s) -> trimmed to the 120s maximum
       ],
-      100,
+      300,
     );
-    expect(candidates).toHaveLength(1);
-    expect(candidates[0]!.viralScore).toBe(90);
+    expect(candidates).toHaveLength(3);
+    const byScore = new Map(candidates.map((c) => [c.viralScore, c]));
+    expect(byScore.get(50)).toMatchObject({ startSec: 0, endSec: 15 });
+    expect(byScore.get(90)).toMatchObject({ startSec: 0, endSec: 30 });
+    expect(byScore.get(99)).toMatchObject({ startSec: 0, endSec: 120 });
+  });
+
+  test("drops a candidate only when it can't reach the minimum duration within video bounds", () => {
+    const candidates = filterAndSortCandidates([raw(90, 130, 70)], 100);
+    expect(candidates).toHaveLength(0);
   });
 
   test("sorts by viralScore descending", () => {
@@ -104,5 +114,51 @@ describe("callDeepSeek", () => {
     }) as unknown as typeof fetch;
 
     await expect(callDeepSeek("prompt", { fetchImpl, maxRetries: 2, baseDelayMs: 1 })).rejects.toThrow(/still down/);
+  });
+});
+
+describe("callNvidia", () => {
+  function fakeResponse(content: string, status = 200) {
+    return new Response(
+      JSON.stringify({
+        choices: [{ message: { content } }],
+        usage: { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 },
+      }),
+      { status },
+    );
+  }
+
+  test("returns content on first success", async () => {
+    const fetchImpl = (async () => fakeResponse("hello")) as unknown as typeof fetch;
+    const result = await callNvidia("prompt", { fetchImpl });
+    expect(result.content).toBe("hello");
+    expect(result.usage).toEqual({ promptTokens: 100, completionTokens: 20, totalTokens: 120 });
+  });
+
+  test("does not retry on an auth error, and the message names NVIDIA_API_KEY", async () => {
+    let calls = 0;
+    const fetchImpl = (async () => {
+      calls++;
+      return fakeResponse("", 401);
+    }) as unknown as typeof fetch;
+
+    await expect(callNvidia("prompt", { fetchImpl, maxRetries: 3, baseDelayMs: 1 })).rejects.toThrow(/NVIDIA_API_KEY/);
+    expect(calls).toBe(1);
+  });
+});
+
+describe("listAiModels", () => {
+  function modelsResponse(ids: string[], status = 200) {
+    return new Response(JSON.stringify({ object: "list", data: ids.map((id) => ({ id })) }), { status });
+  }
+
+  test("returns the model IDs the provider exposes via /models", async () => {
+    const fetchImpl = (async () => modelsResponse(["deepseek-chat", "deepseek-reasoner"])) as unknown as typeof fetch;
+    expect(await listAiModels("deepseek", { fetchImpl })).toEqual(["deepseek-chat", "deepseek-reasoner"]);
+  });
+
+  test("throws a friendly BYOK error on an auth failure", async () => {
+    const fetchImpl = (async () => modelsResponse([], 401)) as unknown as typeof fetch;
+    await expect(listAiModels("deepseek", { fetchImpl })).rejects.toThrow(/BYOK/);
   });
 });

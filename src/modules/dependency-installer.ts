@@ -147,15 +147,15 @@ function whisperCliSpec(): DependencySpec {
 function whisperModelSpec(): DependencySpec {
   return {
     id: "whisper-model",
-    label: "Whisper GGML model (base.en)",
-    sizeEstimateMb: 142,
+    label: "Whisper GGML model (base, multilingual)",
+    sizeEstimateMb: 141,
     destPath: config.whisperModelPath,
     source: {
       kind: "download",
-      url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin",
-      // From the file's git-LFS pointer on HuggingFace (`.../raw/main/ggml-base.en.bin`) — the host's own
+      url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
+      // From the file's git-LFS pointer on HuggingFace (`.../raw/main/ggml-base.bin`) — the host's own
       // record of the blob's hash, not a guess.
-      checksum: { type: "pinned", sha256: "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002" },
+      checksum: { type: "pinned", sha256: "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe" },
     },
   };
 }

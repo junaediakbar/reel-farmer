@@ -66,17 +66,19 @@ export async function generateCaptions(
   outOverlayPath: string,
   style: CaptionStyle = DEFAULT_CAPTION_STYLE,
   context: { runId?: string; clipId?: string } = {},
+  language?: string,
 ): Promise<void> {
   const audioPath = join(clipDir, "words-audio.wav");
   await extractAudioWav(clipVideoPath, audioPath);
-  const whisperWords = await transcribeWordsWithWhisper(audioPath, join(clipDir, "words"));
+  const whisperWords = await transcribeWordsWithWhisper(audioPath, join(clipDir, "words"), language);
 
   const offsetSec = config.captionOffsetMs / 1000;
   const offsetWords = whisperWords.map((w) => ({ ...w, start: w.start + offsetSec, end: w.end + offsetSec }));
 
   const aligned = alignToReference(offsetWords, referenceText, context);
   const groups = groupWords(aligned);
-  // Persisted so a review UI can load/edit word timing later without re-running Whisper.
-  await Bun.write(join(clipDir, "captions.json"), JSON.stringify(groups));
+  // Persisted (with the style it was rendered with) so a review UI can load/edit word timing
+  // and restore the same style later without re-running Whisper.
+  await Bun.write(join(clipDir, "captions.json"), JSON.stringify({ groups, style }));
   await renderCaptionOverlay(groups, style, outOverlayPath);
 }

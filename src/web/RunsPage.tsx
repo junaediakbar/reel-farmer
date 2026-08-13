@@ -151,7 +151,7 @@ export function RunsPage() {
                 <h3 className="truncate text-label-md text-on-surface">{run.title ?? run.videoUrl}</h3>
                 <p className="text-label-sm text-on-surface-variant">
                   {timeAgo(run.createdAt)}
-                  {run.status === "running" && run.currentStage ? ` · ${run.currentStage}` : ""}
+                  {run.status === "running" && run.currentStage ? ` · ${run.currentStage} · ${runProgressPct(run)}%` : ""}
                 </p>
                 {run.errorMessage && <p className="text-sm text-error">{run.errorMessage}</p>}
                 <div className="flex gap-2">

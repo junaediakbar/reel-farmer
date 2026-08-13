@@ -1,14 +1,24 @@
 import { useRef } from "react";
 
-interface ClipTimelineProps {
-  durationSec: number;
+export interface ClipSegment {
+  id: string;
   startSec: number;
   endSec: number;
-  onChange: (startSec: number, endSec: number) => void;
+  label: string;
 }
 
-/** Draggable start/end trim handles over the source video's duration, native Pointer Events — no drag library. */
-export function ClipTimeline({ durationSec, startSec, endSec, onChange }: ClipTimelineProps) {
+interface ClipTimelineProps {
+  durationSec: number;
+  clips: ClipSegment[];
+  activeId: string | null;
+  onSelect: (id: string) => void;
+  onChange: (id: string, startSec: number, endSec: number) => void;
+}
+
+/** Overview track of every AI-identified clip positioned along the source video's duration. Only the active
+ * clip exposes drag handles — dragging or clicking a segment keeps the trackpad and the AI Selections card in sync
+ * via the shared activeId/onSelect state in RunDetail. Native Pointer Events, no drag library. */
+export function ClipTimeline({ durationSec, clips, activeId, onSelect, onChange }: ClipTimelineProps) {
   const trackRef = useRef<HTMLDivElement>(null);
 
   function secAtClientX(clientX: number): number {
@@ -19,13 +29,14 @@ export function ClipTimeline({ durationSec, startSec, endSec, onChange }: ClipTi
     return ratio * durationSec;
   }
 
-  function startDrag(handle: "start" | "end") {
+  function startDrag(clip: ClipSegment, handle: "start" | "end") {
     return (e: React.PointerEvent) => {
       e.preventDefault();
+      e.stopPropagation();
       function onMove(ev: PointerEvent) {
         const sec = secAtClientX(ev.clientX);
-        if (handle === "start") onChange(Math.min(sec, endSec - 0.5), endSec);
-        else onChange(startSec, Math.max(sec, startSec + 0.5));
+        if (handle === "start") onChange(clip.id, Math.min(sec, clip.endSec - 0.5), clip.endSec);
+        else onChange(clip.id, clip.startSec, Math.max(sec, clip.startSec + 0.5));
       }
       function onUp() {
         window.removeEventListener("pointermove", onMove);
@@ -36,27 +47,43 @@ export function ClipTimeline({ durationSec, startSec, endSec, onChange }: ClipTi
     };
   }
 
-  const clampPct = (sec: number) => (durationSec > 0 ? Math.min(100, Math.max(0, (sec / durationSec) * 100)) : 0);
-  const startPct = clampPct(startSec);
-  const endPct = durationSec > 0 ? clampPct(endSec) : 100;
+  const pct = (sec: number) => (durationSec > 0 ? Math.min(100, Math.max(0, (sec / durationSec) * 100)) : 0);
 
   return (
-    <div className="relative mt-2 h-8" ref={trackRef}>
-      <div className="absolute inset-x-0 top-3 h-2 rounded-full bg-surface-container" />
-      <div
-        className="absolute top-3 h-2 rounded-full bg-gradient-to-r from-primary to-primary-bright"
-        style={{ left: `${startPct}%`, width: `${Math.max(0, endPct - startPct)}%` }}
-      />
-      <div
-        className="absolute top-1 -ml-3 h-6 w-6 cursor-ew-resize touch-none rounded-full border-2 border-primary bg-white"
-        style={{ left: `${startPct}%` }}
-        onPointerDown={startDrag("start")}
-      />
-      <div
-        className="absolute top-1 -ml-3 h-6 w-6 cursor-ew-resize touch-none rounded-full border-2 border-primary bg-white"
-        style={{ left: `${endPct}%` }}
-        onPointerDown={startDrag("end")}
-      />
+    <div ref={trackRef} className="relative h-14 w-full rounded-xl bg-surface-container-low">
+      {clips.map((clip) => {
+        const isActive = clip.id === activeId;
+        const left = pct(clip.startSec);
+        const width = Math.max(0.6, pct(clip.endSec) - left);
+        return (
+          <div
+            key={clip.id}
+            onClick={() => onSelect(clip.id)}
+            title={clip.label}
+            className={`absolute top-1/2 h-9 -translate-y-1/2 cursor-pointer overflow-hidden rounded-lg transition-colors ${
+              isActive ? "z-10 bg-primary ring-2 ring-primary ring-offset-1 ring-offset-surface-container-low" : "bg-primary/30 hover:bg-primary/50"
+            }`}
+            // minWidth in px (not just a %-based floor) keeps short clips tappable — on a long
+            // source video a 0.6%-wide segment can render at just a few px, under any reasonable
+            // touch target size.
+            style={{ left: `${left}%`, width: `${width}%`, minWidth: "28px" }}
+          >
+            <span className="block truncate px-2 text-[10px] font-semibold leading-9 text-white">{clip.label}</span>
+            {isActive && (
+              <>
+                <div
+                  className="absolute -left-1.5 top-1/2 h-7 w-3 -translate-y-1/2 cursor-ew-resize touch-none rounded-full border-2 border-primary bg-white"
+                  onPointerDown={startDrag(clip, "start")}
+                />
+                <div
+                  className="absolute -right-1.5 top-1/2 h-7 w-3 -translate-y-1/2 cursor-ew-resize touch-none rounded-full border-2 border-primary bg-white"
+                  onPointerDown={startDrag(clip, "end")}
+                />
+              </>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
