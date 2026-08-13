@@ -4,6 +4,7 @@ import { config } from "../config";
 import { log } from "../logger";
 import {
   composeReel,
+  extractBestFrameThumbnail,
   extractThumbnailFrame,
   type EndingWatermarkFilterOptions,
   type WatermarkFilterOptions,
@@ -74,8 +75,9 @@ function resolveEndingWatermark(runDir: string, watermark?: EndingWatermarkOptio
   return { ...resolveWatermark(runDir, watermark)!, durationSec: watermark.durationSec };
 }
 
-/** Writes the clip's thumbnail if the user opted into one — a custom upload wins over a frame pick;
- * neither set means no thumbnail file, matching PRD's "opsional, default off" for the whole panel. */
+/** Writes the clip's thumbnail — a custom upload or picked frame wins if the user opted into one
+ * (PRD §7.1/G19); otherwise auto-generates one from the best frame (PRD #12, G9) so every clip gets
+ * a thumbnail without requiring the optional Pre-Production panel. */
 async function writeThumbnail(
   runDir: string,
   outputDir: string,
@@ -88,6 +90,8 @@ async function writeThumbnail(
     await Bun.write(thumbPath, Bun.file(join(runDir, "assets", basename(preProduction.thumbnailAsset))));
   } else if (preProduction.thumbnailFrameSec !== undefined) {
     await extractThumbnailFrame(finalPath, preProduction.thumbnailFrameSec, thumbPath);
+  } else {
+    await extractBestFrameThumbnail(finalPath, thumbPath);
   }
 }
 

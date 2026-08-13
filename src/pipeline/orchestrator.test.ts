@@ -92,6 +92,9 @@ mock.module("../modules/composer", () => ({
   composeReel: mock(async () => {
     callLog.push("compose");
   }),
+  // Default (no thumbnail choice) auto-generates via ffmpeg's `thumbnail` filter — stub it so
+  // these tests don't shell out; composeReel is mocked so finalPath never has real frames anyway.
+  extractBestFrameThumbnail: mock(async () => {}),
 }));
 
 const { runPipeline, runUntilSelection, processSelectedClips, regenerateCaptionOverlay } = await import("./orchestrator");

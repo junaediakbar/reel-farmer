@@ -126,3 +126,10 @@ export async function composeReel(
 export async function extractThumbnailFrame(sourcePath: string, frameSec: number, outPath: string): Promise<void> {
   await runCommandOrThrow(["ffmpeg", "-y", "-ss", String(Math.max(0, frameSec)), "-i", sourcePath, "-frames:v", "1", "-q:v", "3", outPath]);
 }
+
+/** Auto-generates a thumbnail when the user picked neither a custom image nor a frame (PRD #12, G9).
+ * ffmpeg's `thumbnail` filter scores frames by how representative they are of the surrounding batch
+ * (scene-change heuristic) and keeps the best one — "frame terbaik" without hand-rolled scoring. */
+export async function extractBestFrameThumbnail(sourcePath: string, outPath: string): Promise<void> {
+  await runCommandOrThrow(["ffmpeg", "-y", "-i", sourcePath, "-vf", "thumbnail", "-frames:v", "1", "-q:v", "3", outPath]);
+}
