@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { DEFAULT_CAPTION_STYLE, splitCaptionLines, type CaptionGroup, type CaptionsFile, type CaptionStyle } from "../pipeline/types";
+import {
+  DEFAULT_CAPTION_STYLE,
+  isTooCloseToChromaKey,
+  splitCaptionLines,
+  type CaptionGroup,
+  type CaptionsFile,
+  type CaptionStyle,
+  type ClipProgress,
+} from "../pipeline/types";
 import { CAPTION_PRESETS, CAPTION_PRESET_NAMES } from "./captionPresets";
 import { LANGUAGES } from "./languages";
 import { Button } from "./components/ui/button";
@@ -26,7 +34,13 @@ function cqw(px: number): string {
 
 const FONT_CHOICES = ["Plus Jakarta Sans", "Arial", "Georgia", "Verdana", "Courier New", "Comic Sans MS"];
 
-const COLOR_SWATCHES = ["#ffffff", "#ffafd3", "#c0c1ff", "#0b1c30"];
+// Guarded by isTooCloseToChromaKey (pipeline/types.ts) against the export's chroma-keyer, not by
+// avoiding specific shades here — any swatch is safe as long as it clears that check.
+const COLOR_SWATCHES = ["#ffffff", "#ffafd3", "#c0c1ff", "#1a237e"];
+
+// The two checkpoint stages `regenerate()` re-runs (skips EXTRACT_CLIPS/REMOVE_SILENCE) — polled
+// to drive the progress bar while the render is in flight.
+const REGEN_STAGES = ["GENERATE_CAPTIONS", "COMPOSE_REEL"] as const;
 
 /** Extends word `wordIdx` in group `groupIdx` by `deltaSec` (clamped to a 0.05s min duration) and syncs the group's end to its last word. */
 export function applyWordResize(groups: CaptionGroup[], groupIdx: number, wordIdx: number, deltaSec: number): CaptionGroup[] {
@@ -41,10 +55,12 @@ export function CaptionEditor({ runId, clipId, onBack }: CaptionEditorProps) {
   const [groups, setGroups] = useState<CaptionGroup[]>([]);
   const [style, setStyle] = useState<CaptionStyle>(DEFAULT_CAPTION_STYLE);
   const [saving, setSaving] = useState(false);
+  const [regenPct, setRegenPct] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [previewTime, setPreviewTime] = useState(0);
   const [language, setLanguage] = useState("auto");
   const [retranscribing, setRetranscribing] = useState(false);
+  const [colorWarning, setColorWarning] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -58,6 +74,17 @@ export function CaptionEditor({ runId, clipId, onBack }: CaptionEditorProps) {
 
   function updateStyle(patch: Partial<CaptionStyle>) {
     setStyle((prev) => ({ ...prev, ...patch }));
+  }
+
+  /** Guards the custom color pickers: a text/highlight color too close to the export's chroma-key
+   * green gets keyed out along with the background, punching holes in the rendered captions. */
+  function updateColor(key: "primaryColor" | "activeColor", hex: string) {
+    if (isTooCloseToChromaKey(hex)) {
+      setColorWarning("That color is too close to the render's keying color and would leave gaps in the exported captions — pick a different shade.");
+      return;
+    }
+    setColorWarning(null);
+    updateStyle({ [key]: hex });
   }
 
   function updateGroupText(groupIdx: number, text: string) {
@@ -95,15 +122,34 @@ export function CaptionEditor({ runId, clipId, onBack }: CaptionEditorProps) {
   async function regenerate() {
     setSaving(true);
     setError(null);
+    setRegenPct(0);
+    // Both stages are typically already "completed" from the original render, so only count a
+    // stage once it finishes *after* this click — otherwise the bar would start at 100%.
+    const startedAt = new Date().toISOString();
+    const poll = setInterval(async () => {
+      const r = await fetch(`/api/runs/${runId}`);
+      if (!r.ok) return;
+      const { clipProgress } = (await r.json()) as { clipProgress: ClipProgress[] };
+      const done = clipProgress.filter(
+        (p) =>
+          p.clipId === clipId &&
+          REGEN_STAGES.includes(p.stage as (typeof REGEN_STAGES)[number]) &&
+          p.status === "completed" &&
+          (p.completedAt ?? "") >= startedAt,
+      ).length;
+      setRegenPct(Math.round((done / REGEN_STAGES.length) * 100));
+    }, 1000);
     try {
       const res = await fetch(`/api/runs/${runId}/clips/${clipId}/captions/regenerate`, {
         method: "POST",
         body: JSON.stringify({ groups, style }),
       });
       if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? "Regenerate failed");
+      setRegenPct(100);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
+      clearInterval(poll);
       setSaving(false);
     }
   }
@@ -185,7 +231,7 @@ export function CaptionEditor({ runId, clipId, onBack }: CaptionEditorProps) {
                                   fontSize: cqw(style.fontSize),
                                   fontWeight: style.fontWeight,
                                   color: isActive ? style.activeColor : style.primaryColor,
-                                  WebkitTextStroke: style.outline ? `${cqw(2)} rgba(0,0,0,0.6)` : undefined,
+                                  WebkitTextStroke: style.outline ? `${cqw(2)} #000000` : undefined,
                                 }}
                               >
                                 {w.word}
@@ -340,7 +386,7 @@ export function CaptionEditor({ runId, clipId, onBack }: CaptionEditorProps) {
                     type="color"
                     aria-label="Custom text color"
                     value={style.primaryColor}
-                    onChange={(e) => updateStyle({ primaryColor: e.target.value })}
+                    onChange={(e) => updateColor("primaryColor", e.target.value)}
                     className="h-8 w-8 cursor-pointer rounded-full border border-outline-variant bg-transparent p-0"
                   />
                 </div>
@@ -366,11 +412,12 @@ export function CaptionEditor({ runId, clipId, onBack }: CaptionEditorProps) {
                     type="color"
                     aria-label="Custom highlight color"
                     value={style.activeColor}
-                    onChange={(e) => updateStyle({ activeColor: e.target.value })}
+                    onChange={(e) => updateColor("activeColor", e.target.value)}
                     className="h-8 w-8 cursor-pointer rounded-full border border-outline-variant bg-transparent p-0"
                   />
                 </div>
               </div>
+              {colorWarning && <p className="text-sm text-error">{colorWarning}</p>}
 
               {/* Toggle */}
               <div className="flex items-center justify-between">
@@ -456,6 +503,9 @@ export function CaptionEditor({ runId, clipId, onBack }: CaptionEditorProps) {
                 <span className="material-symbols-outlined">auto_awesome</span>
                 {saving ? "Regenerating…" : "Regenerate overlay"}
               </Button>
+              {saving && (
+                <progress value={regenPct} max={100} className="h-1.5 w-full overflow-hidden rounded-full accent-primary [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-surface-container-high [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:transition-[width]" />
+              )}
             </div>
           </div>
         </div>

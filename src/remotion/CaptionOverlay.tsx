@@ -1,10 +1,10 @@
 import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
-import { splitCaptionLines, type CaptionGroup, type CaptionStyle } from "../pipeline/types";
+import { CHROMA_KEY, splitCaptionLines, type CaptionGroup, type CaptionStyle } from "../pipeline/types";
 
 // ponytail: composited via chroma key, not alpha — WebM/VP8 alpha decodes as opaque
 // in system ffmpeg (verified: alpha_mode=1 flag set but no alpha plane), which blacked
-// out the source footage in composer.ts. Keep in sync with the colorkey value there.
-export const CHROMA_KEY = "#00ff00";
+// out the source footage in composer.ts. CHROMA_KEY's doc comment (pipeline/types.ts) covers
+// the value and why caption colors must stay clear of it.
 
 export interface CaptionOverlayProps {
   groups: CaptionGroup[];
@@ -45,7 +45,10 @@ export const CaptionOverlay: React.FC<CaptionOverlayProps> = ({ groups, style })
                     fontSize: style.fontSize,
                     fontWeight: style.fontWeight,
                     color: isActive ? style.activeColor : style.primaryColor,
-                    WebkitTextStroke: style.outline ? "2px rgba(0,0,0,0.6)" : undefined,
+                    // Opaque, not rgba() — an alpha stroke composites against the chroma-key green
+                    // right here (before ffmpeg's colorkey ever sees it), punching a transparent
+                    // ring into every glyph edge on export. See pipeline/types.ts's CHROMA_KEY doc.
+                    WebkitTextStroke: style.outline ? "2px #000000" : undefined,
                   }}
                 >
                   {word.word}

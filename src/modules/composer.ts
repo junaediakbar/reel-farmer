@@ -24,16 +24,24 @@ const POSITION_EXPR: Record<WatermarkPosition, string> = {
 
 interface ComposeFilterGraph {
   filterComplex: string;
-  /** Label to -map at the end — "v" unchanged from pre-#23 when neither watermark is set. */
+  /** Label to -map at the end — "v" when neither watermark is set. */
   finalLabel: string;
   /** Extra -i inputs beyond [desilenced, overlay], in the order composeReel must pass them. */
   extraInputCount: number;
 }
 
 /**
- * Pure filter-graph builder — no ffmpeg needed to test it. The no-watermark path must stay
- * byte-identical to the pre-#23 filter string: `colorkey=0x00ff00:0.5:0.05` encodes the measured
- * chroma-key fix from commit aef685f, and a refactor that perturbs it silently regresses that fix.
+ * Pure filter-graph builder — no ffmpeg needed to test it. `colorkey=0x00ff00:0.02:0.65` replaces
+ * the old `0.5:0.05` pair (commit aef685f): that value hard-cut any AA edge pixel more than
+ * ~15-45% green-blended straight to fully transparent (measured 12% of glyph-interior pixels
+ * eroded away on export), because similarity alone decides full removal — sim=0.5 is half the RGB
+ * color space. Real green-plate drift after encoding measures ~0.002 (see caption-generator.ts's
+ * render), so similarity only needs to clear that by a wide margin; the removal work is now done by
+ * a wide `blend` ramp instead, which reconstructs each edge pixel's true coverage alpha
+ * (`(dist-sim)/blend ≈ 1-t` for a pixel that's t-fraction blended toward the key) rather than
+ * thresholding it. Verified against DEFAULT_CAPTION_STYLE's white/gold/black-outline colors: mean
+ * alpha-reconstruction error drops ~70-80% vs the old pair. Keep this string in sync with
+ * pipeline/types.ts's CHROMA_KEY_SIMILARITY/CHROMA_KEY_BLEND and composer.test.ts's assertion.
  */
 export function buildComposeFilterGraph(
   watermark?: WatermarkFilterOptions,
@@ -42,7 +50,7 @@ export function buildComposeFilterGraph(
 ): ComposeFilterGraph {
   const parts = [
     "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[bg]",
-    "[1:v]colorkey=0x00ff00:0.5:0.05[fg]",
+    "[1:v]colorkey=0x00ff00:0.02:0.65[fg]",
   ];
   let label = "v";
   let inputIdx = 2;

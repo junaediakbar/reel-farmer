@@ -2,10 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { buildComposeFilterGraph } from "./composer";
 
 describe("buildComposeFilterGraph", () => {
-  test("no watermark stays byte-identical to the pre-#23 filter string", () => {
+  test("no watermark uses the current colorkey filter string", () => {
     const graph = buildComposeFilterGraph();
     expect(graph.filterComplex).toBe(
-      "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[bg];[1:v]colorkey=0x00ff00:0.5:0.05[fg];[bg][fg]overlay=0:0[v]",
+      "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[bg];[1:v]colorkey=0x00ff00:0.02:0.65[fg];[bg][fg]overlay=0:0[v]",
     );
     expect(graph.finalLabel).toBe("v");
     expect(graph.extraInputCount).toBe(0);

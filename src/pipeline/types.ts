@@ -95,6 +95,37 @@ export interface CaptionGroup {
   end: number;
 }
 
+/** COMPOSE_REEL keys this exact green out of the caption overlay to composite it over the source
+ * footage (composer.ts's `colorkey=0x00ff00:0.02:0.65` — keep the hex in sync with that filter, and
+ * CaptionOverlay.tsx's chroma-key background). A caption color picked close enough to this green
+ * gets keyed out too, punching transparent holes in the rendered text. */
+export const CHROMA_KEY = "#00ff00";
+
+// Mirrors composer.ts's colorkey similarity — keep numbers in sync with that filter string.
+const CHROMA_KEY_SIMILARITY = 0.02;
+
+// A caption color's anti-aliased edge linearly interpolates toward pure green as glyph coverage
+// drops, so a pixel goes fully transparent once it's more than (1 - CHROMA_KEY_SIMILARITY/dist)
+// green-blended. Requiring that only the innermost 20% of that gradient (nearest pure green) can
+// vanish keeps the glyph shape intact; solving for dist gives this floor.
+const MAX_ERODED_EDGE_FRACTION = 0.2;
+const CHROMA_KEY_RADIUS = CHROMA_KEY_SIMILARITY / MAX_ERODED_EDGE_FRACTION;
+
+function hexToRgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/** True if `hex` falls inside the export chroma-keyer's erosion-safety radius around CHROMA_KEY —
+ * picking it for caption text would visibly eat into glyph edges (or, for near-exact greens,
+ * disappear outright) in the rendered video. */
+export function isTooCloseToChromaKey(hex: string): boolean {
+  const [r, g, b] = hexToRgb(hex);
+  const [kr, kg, kb] = hexToRgb(CHROMA_KEY);
+  const dist = Math.sqrt((r - kr) ** 2 + (g - kg) ** 2 + (b - kb) ** 2) / (255 * Math.sqrt(3));
+  return dist <= CHROMA_KEY_RADIUS;
+}
+
 export interface CaptionStyle {
   fontFamily: string;
   fontSize: number;
