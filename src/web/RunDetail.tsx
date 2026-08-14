@@ -413,14 +413,17 @@ export function RunDetail({ runId, onBack, onDeleted, onOpenCaptions }: RunDetai
                         {status === "rendered" ? (
                           <video
                             src={`/api/runs/${runId}/clips/${clip.id}/video`}
+                            poster={`/api/runs/${runId}/clips/${clip.id}/thumbnail`}
                             muted
                             preload="metadata"
                             className="h-full w-full object-cover"
                           />
                         ) : (
-                          <div className="flex h-full w-full items-center justify-center text-outline">
-                            <span className="material-symbols-outlined">movie</span>
-                          </div>
+                          <img
+                            src={`/api/runs/${runId}/clips/${clip.id}/preview-thumbnail`}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
                         )}
                         <span className="absolute bottom-2 right-2 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white backdrop-blur-sm">
                           {formatDuration(clip.endSec - clip.startSec)}

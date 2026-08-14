@@ -25,6 +25,7 @@ import {
   retranscribeCaptionOverlay,
   runUntilSelection,
 } from "../pipeline/orchestrator";
+import { extractThumbnailFrame } from "../modules/composer";
 import { checkStatus, installAll } from "../modules/dependency-installer";
 import { activateLicense, checkLicense } from "../modules/license";
 import { listAiModels } from "../modules/clip-identifier";
@@ -471,6 +472,27 @@ export function createServer(checkpoint: CheckpointManager = new CheckpointManag
           if (!clip) return new Response("Not found", { status: 404 });
           const path = finalThumbnailPath(join(config.outputDir, dl.videoId), clip);
           if (!existsSync(path)) return new Response("Not found", { status: 404 });
+          return new Response(Bun.file(path));
+        },
+      },
+
+      // Pre-render preview thumbnail — pending/rendering clips have no composed output yet,
+      // so pull a frame straight from the source video at the clip's start time (cached to disk).
+      "/api/runs/:id/clips/:clipId/preview-thumbnail": {
+        GET: async (req) => {
+          const dl = await readDownloadResult(req.params.id!);
+          if (!dl) return new Response("Not found", { status: 404 });
+          const clipsPath = join(config.runsDir, req.params.id!, "clips.json");
+          if (!existsSync(clipsPath)) return new Response("Not found", { status: 404 });
+          const clips = (await Bun.file(clipsPath).json()) as ClipCandidate[];
+          const clip = clips.find((c) => c.id === req.params.clipId!);
+          if (!clip) return new Response("Not found", { status: 404 });
+          const clipDir = join(config.runsDir, req.params.id!, "clips", clip.id);
+          const path = join(clipDir, "preview-thumb.jpg");
+          if (!existsSync(path)) {
+            mkdirSync(clipDir, { recursive: true });
+            await extractThumbnailFrame(dl.videoPath, clip.startSec, path);
+          }
           return new Response(Bun.file(path));
         },
       },
