@@ -3,14 +3,14 @@ import type { CaptionStyle } from "../pipeline/types";
 /** Named caption style presets shared by the caption editor and the run detail's export flow. */
 export const CAPTION_PRESETS: Record<string, CaptionStyle> = {
   Pop: {
-    fontFamily: "Plus Jakarta Sans",
-    fontSize: 64,
+    fontFamily: "Arial",
+    fontSize: 75,
     fontWeight: 800,
-    lineHeight: 1.2,
+    lineHeight: 0,
     outline: true,
     primaryColor: "#ffffff",
-    activeColor: "#c0c1ff",
-    position: "bottom",
+    activeColor: "#ffff00",
+    position: "center",
     animate: true,
   },
   Minimal: {
