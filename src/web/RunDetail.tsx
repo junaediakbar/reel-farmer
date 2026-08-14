@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CLIP_STAGES,
+  DEFAULT_CAPTION_STYLE,
   GLOBAL_STAGES,
+  type CaptionGroup,
+  type CaptionStyle,
   type ClipCandidate,
   type ClipProgress,
   type GlobalStage,
@@ -9,14 +12,14 @@ import {
   type PreProductionOptions,
   type TokenUsage,
 } from "../pipeline/types";
-import { CAPTION_PRESETS, CAPTION_PRESET_NAMES } from "./captionPresets";
+import { CaptionOverlayPreview } from "./CaptionOverlayPreview";
+import { CaptionStyleControls } from "./CaptionStyleControls";
 import { SourceVideoPlayer } from "./SourceVideoPlayer";
 import { ClipTimeline } from "./ClipTimeline";
 import { PreProductionPanel } from "./PreProductionPanel";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Textarea } from "./components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
 import { Badge, type BadgeProps } from "./components/ui/badge";
 
 interface RunDetailData {
@@ -43,6 +46,23 @@ function newCustomClip(): EditableClip {
     selected: true,
   };
 }
+
+// Real transcript timing doesn't exist until GENERATE_CAPTIONS runs, so the pre-export style
+// preview loops this canned line instead — it's only there to show font/color/position/animation
+// choices, not synced captions. previewTime is fed in modulo `end` so the highlight keeps cycling
+// regardless of how long the source video actually is.
+const CAPTION_STYLE_SAMPLE: CaptionGroup = {
+  words: [
+    { word: "Your", start: 0, end: 0.4 },
+    { word: "captions", start: 0.4, end: 0.9 },
+    { word: "will", start: 0.9, end: 1.1 },
+    { word: "look", start: 1.1, end: 1.4 },
+    { word: "like", start: 1.4, end: 1.6 },
+    { word: "this", start: 1.6, end: 2.4 },
+  ],
+  start: 0,
+  end: 2.4,
+};
 
 /** Parses a pasted JSON blob (single clip or array) into importable clips, throwing on missing numeric startSec/endSec. */
 export function parseImportedClips(importText: string): EditableClip[] {
@@ -134,7 +154,8 @@ export function RunDetail({ runId, onBack, onDeleted, onOpenCaptions }: RunDetai
   const [rendering, setRendering] = useState(false);
   const [trimTargetId, setTrimTargetId] = useState<string | null>(null);
   const [sourceDuration, setSourceDuration] = useState(0);
-  const [captionStyleName, setCaptionStyleName] = useState<string>(CAPTION_PRESET_NAMES[0]!);
+  const [captionStyle, setCaptionStyle] = useState<CaptionStyle>(DEFAULT_CAPTION_STYLE);
+  const [captionPreviewTime, setCaptionPreviewTime] = useState(0);
   const [preProduction, setPreProduction] = useState<PreProductionOptions>({});
   const scrubVideoRef = useRef<HTMLVideoElement>(null);
 
@@ -222,7 +243,7 @@ export function RunDetail({ runId, onBack, onDeleted, onOpenCaptions }: RunDetai
     setRendering(true);
     await fetch(`/api/runs/${runId}/select`, {
       method: "POST",
-      body: JSON.stringify({ clips: selected, style: CAPTION_PRESETS[captionStyleName], preProduction }),
+      body: JSON.stringify({ clips: selected, style: captionStyle, preProduction }),
     });
     setRendering(false);
     refresh();
@@ -284,25 +305,10 @@ export function RunDetail({ runId, onBack, onDeleted, onOpenCaptions }: RunDetai
             Delete run
           </Button>
           {canEdit && (
-            <div className="flex items-center gap-2">
-              <Select value={captionStyleName} onValueChange={setCaptionStyleName}>
-                <SelectTrigger className="w-36" aria-label="Caption style">
-                  <span className="material-symbols-outlined text-[16px]">text_fields</span>
-                  <SelectValue placeholder="Caption style" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CAPTION_PRESET_NAMES.map((name) => (
-                    <SelectItem key={name} value={name}>
-                      {name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button variant="primary" onClick={renderSelected} disabled={rendering || run.status === "running" || selectedCount === 0}>
-                <span className="material-symbols-outlined">movie</span>
-                {rendering || run.status === "running" ? "Rendering…" : "Export Selected"}
-              </Button>
-            </div>
+            <Button variant="primary" onClick={renderSelected} disabled={rendering || run.status === "running" || selectedCount === 0}>
+              <span className="material-symbols-outlined">movie</span>
+              {rendering || run.status === "running" ? "Rendering…" : "Export Selected"}
+            </Button>
           )}
         </div>
       </header>
@@ -346,7 +352,9 @@ export function RunDetail({ runId, onBack, onDeleted, onOpenCaptions }: RunDetai
                   startSec={trimTarget.startSec}
                   endSec={trimTarget.endSec}
                   onDuration={setSourceDuration}
+                  onTimeUpdate={(t) => setCaptionPreviewTime(t % CAPTION_STYLE_SAMPLE.end)}
                   videoRef={scrubVideoRef}
+                  overlay={<CaptionOverlayPreview group={CAPTION_STYLE_SAMPLE} style={captionStyle} previewTime={captionPreviewTime} />}
                 />
                 <div className="soft-shadow flex flex-col gap-3 rounded-2xl bg-surface-container-lowest p-4">
                   <h3 className="text-label-md text-on-surface-variant">Timeline Compilation</h3>
@@ -361,6 +369,12 @@ export function RunDetail({ runId, onBack, onDeleted, onOpenCaptions }: RunDetai
                     }}
                   />
                 </div>
+                <details className="soft-shadow rounded-2xl bg-surface-container-lowest p-4">
+                  <summary className="cursor-pointer text-label-md text-on-surface-variant">Caption Style</summary>
+                  <div className="mt-4">
+                    <CaptionStyleControls style={captionStyle} onChange={(patch) => setCaptionStyle((prev) => ({ ...prev, ...patch }))} />
+                  </div>
+                </details>
                 <PreProductionPanel runId={runId} value={preProduction} onChange={setPreProduction} />
               </div>
             ) : (

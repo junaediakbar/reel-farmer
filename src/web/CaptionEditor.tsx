@@ -1,19 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import {
   DEFAULT_CAPTION_STYLE,
-  isTooCloseToChromaKey,
-  splitCaptionLines,
   type CaptionGroup,
   type CaptionsFile,
   type CaptionStyle,
   type ClipProgress,
 } from "../pipeline/types";
-import { CAPTION_PRESETS, CAPTION_PRESET_NAMES } from "./captionPresets";
+import { CaptionOverlayPreview } from "./CaptionOverlayPreview";
+import { CaptionStyleControls } from "./CaptionStyleControls";
 import { LANGUAGES } from "./languages";
 import { Button } from "./components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
-import { Switch } from "./components/ui/switch";
-import { cn } from "./lib/utils";
 
 interface CaptionEditorProps {
   runId: string;
@@ -22,21 +19,6 @@ interface CaptionEditorProps {
 }
 
 const PIXELS_PER_SEC = 60;
-
-// Remotion renders the overlay at this native width (src/remotion/index.tsx) — every px value
-// below must convert through this constant so the preview is a true scaled-down copy of the
-// actual export, not an approximation. cqw (container query width) ties it to the preview box's
-// real on-screen size instead of a guessed browser window, so it stays correct at any zoom/window size.
-const RENDER_WIDTH_PX = 1080;
-function cqw(px: number): string {
-  return `${(px / RENDER_WIDTH_PX) * 100}cqw`;
-}
-
-const FONT_CHOICES = ["Plus Jakarta Sans", "Arial", "Georgia", "Verdana", "Courier New", "Comic Sans MS"];
-
-// Guarded by isTooCloseToChromaKey (pipeline/types.ts) against the export's chroma-keyer, not by
-// avoiding specific shades here — any swatch is safe as long as it clears that check.
-const COLOR_SWATCHES = ["#ffffff", "#ffafd3", "#c0c1ff", "#1a237e"];
 
 // The two checkpoint stages `regenerate()` re-runs (skips EXTRACT_CLIPS/REMOVE_SILENCE) — polled
 // to drive the progress bar while the render is in flight.
@@ -60,7 +42,6 @@ export function CaptionEditor({ runId, clipId, onBack }: CaptionEditorProps) {
   const [previewTime, setPreviewTime] = useState(0);
   const [language, setLanguage] = useState("auto");
   const [retranscribing, setRetranscribing] = useState(false);
-  const [colorWarning, setColorWarning] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -74,17 +55,6 @@ export function CaptionEditor({ runId, clipId, onBack }: CaptionEditorProps) {
 
   function updateStyle(patch: Partial<CaptionStyle>) {
     setStyle((prev) => ({ ...prev, ...patch }));
-  }
-
-  /** Guards the custom color pickers: a text/highlight color too close to the export's chroma-key
-   * green gets keyed out along with the background, punching holes in the rendered captions. */
-  function updateColor(key: "primaryColor" | "activeColor", hex: string) {
-    if (isTooCloseToChromaKey(hex)) {
-      setColorWarning("That color is too close to the render's keying color and would leave gaps in the exported captions — pick a different shade.");
-      return;
-    }
-    setColorWarning(null);
-    updateStyle({ [key]: hex });
   }
 
   function updateGroupText(groupIdx: number, text: string) {
@@ -177,7 +147,6 @@ export function CaptionEditor({ runId, clipId, onBack }: CaptionEditorProps) {
   // Falls back to the first group so style/font/size edits are visible immediately, before the
   // video has been played to a timestamp that falls inside a caption's own [start, end) range.
   const activeGroup = groups.find((g) => previewTime >= g.start && previewTime < g.end) ?? groups[0];
-  const justifyContent = style.position === "top" ? "flex-start" : style.position === "center" ? "center" : "flex-end";
 
   return (
     <div className="flex flex-col">
@@ -208,41 +177,7 @@ export function CaptionEditor({ runId, clipId, onBack }: CaptionEditorProps) {
                 onTimeUpdate={(e) => setPreviewTime(e.currentTarget.currentTime)}
                 className="h-full w-full object-cover"
               />
-              {activeGroup && (
-                <div
-                  className="pointer-events-none absolute inset-0 flex flex-col items-center"
-                  style={{ justifyContent, alignItems: "center", padding: cqw(48) }}
-                >
-                  <div
-                    className="flex flex-col items-center"
-                    style={{ rowGap: cqw(style.fontSize * (style.lineHeight - 1)), maxWidth: "90%" }}
-                  >
-                    {splitCaptionLines(activeGroup.words)
-                      .filter((line) => line.length > 0)
-                      .map((line, li) => (
-                        <div key={li} className="flex flex-wrap justify-center gap-x-[0.4em]">
-                          {line.map((w, i) => {
-                            const isActive = style.animate && previewTime >= w.start && previewTime < w.end;
-                            return (
-                              <span
-                                key={i}
-                                style={{
-                                  fontFamily: style.fontFamily,
-                                  fontSize: cqw(style.fontSize),
-                                  fontWeight: style.fontWeight,
-                                  color: isActive ? style.activeColor : style.primaryColor,
-                                  WebkitTextStroke: style.outline ? `${cqw(2)} #000000` : undefined,
-                                }}
-                              >
-                                {w.word}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
+              <CaptionOverlayPreview group={activeGroup} style={style} previewTime={previewTime} />
             </div>
             <p className="text-label-sm text-on-surface-variant">Live preview — footage before captions are rendered in</p>
           </div>
@@ -255,186 +190,7 @@ export function CaptionEditor({ runId, clipId, onBack }: CaptionEditorProps) {
             </div>
 
             <div className="flex flex-1 flex-col gap-8 overflow-y-auto p-6">
-              {/* Presets */}
-              <div>
-                <label className="mb-4 block text-label-md text-on-surface">Style Presets</label>
-                <div className="grid grid-cols-3 gap-3">
-                  {CAPTION_PRESET_NAMES.map((name) => {
-                    const preset = CAPTION_PRESETS[name]!;
-                    return (
-                      <button
-                        key={name}
-                        type="button"
-                        onClick={() => setStyle(preset)}
-                        className={cn(
-                          "aspect-square rounded-xl border-2 text-sm font-semibold transition-colors",
-                          style.fontFamily === preset.fontFamily && style.position === preset.position && style.animate === preset.animate
-                            ? "border-primary bg-surface-container-high text-primary"
-                            : "border-outline-variant bg-surface-container-lowest text-on-surface hover:bg-surface-container",
-                        )}
-                      >
-                        {name}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Typography */}
-              <div>
-                <label className="mb-4 block text-label-md text-on-surface">Typography</label>
-                <div className="flex flex-col gap-4">
-                  <Select value={style.fontFamily} onValueChange={(v) => updateStyle({ fontFamily: v })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {FONT_CHOICES.map((f) => (
-                        <SelectItem key={f} value={f}>
-                          {f}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <div className="flex rounded-lg border border-outline-variant bg-surface-container-lowest overflow-hidden">
-                    {(["top", "center", "bottom"] as const).map((pos) => (
-                      <button
-                        key={pos}
-                        type="button"
-                        onClick={() => updateStyle({ position: pos })}
-                        className={cn(
-                          "flex-1 py-2 text-sm font-semibold capitalize transition-colors",
-                          style.position === pos ? "bg-primary-container text-on-primary-container" : "hover:bg-surface-container",
-                        )}
-                      >
-                        {pos}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Size */}
-              <div>
-                <div className="mb-2 flex justify-between">
-                  <label className="text-label-sm text-on-surface-variant">Size</label>
-                  <span className="text-label-sm text-primary">{style.fontSize}px</span>
-                </div>
-                <input
-                  type="range"
-                  min={12}
-                  max={120}
-                  value={style.fontSize}
-                  onChange={(e) => updateStyle({ fontSize: Number(e.target.value) })}
-                  className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-surface-container-highest accent-primary"
-                />
-              </div>
-
-              {/* Weight */}
-              <div>
-                <div className="mb-2 flex justify-between">
-                  <label className="text-label-sm text-on-surface-variant">Weight</label>
-                  <span className="text-label-sm text-primary">{style.fontWeight}</span>
-                </div>
-                <input
-                  type="range"
-                  min={400}
-                  max={900}
-                  step={100}
-                  value={style.fontWeight}
-                  onChange={(e) => updateStyle({ fontWeight: Number(e.target.value) })}
-                  className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-surface-container-highest accent-primary"
-                />
-              </div>
-
-              {/* Line height */}
-              <div>
-                <div className="mb-2 flex justify-between">
-                  <label className="text-label-sm text-on-surface-variant">Line Spacing</label>
-                  <span className="text-label-sm text-primary">{style.lineHeight.toFixed(1)}×</span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={1.5}
-                  step={0.1}
-                  value={style.lineHeight}
-                  onChange={(e) => updateStyle({ lineHeight: Number(e.target.value) })}
-                  className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-surface-container-highest accent-primary"
-                />
-              </div>
-
-              {/* Colors */}
-              <div>
-                <label className="mb-2 block text-label-md text-on-surface">Text Color</label>
-                <div className="flex gap-3">
-                  {COLOR_SWATCHES.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      aria-label={`Text color ${c}`}
-                      onClick={() => updateStyle({ primaryColor: c })}
-                      className={cn(
-                        "h-8 w-8 rounded-full border border-outline-variant transition-transform hover:scale-110",
-                        style.primaryColor === c && "ring-2 ring-primary ring-offset-2",
-                      )}
-                      style={{ backgroundColor: c }}
-                    />
-                  ))}
-                  <input
-                    type="color"
-                    aria-label="Custom text color"
-                    value={style.primaryColor}
-                    onChange={(e) => updateColor("primaryColor", e.target.value)}
-                    className="h-8 w-8 cursor-pointer rounded-full border border-outline-variant bg-transparent p-0"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-label-md text-on-surface">Highlight Color</label>
-                <div className="flex gap-3">
-                  {COLOR_SWATCHES.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      aria-label={`Highlight color ${c}`}
-                      onClick={() => updateStyle({ activeColor: c })}
-                      className={cn(
-                        "h-8 w-8 rounded-full border border-outline-variant transition-transform hover:scale-110",
-                        style.activeColor === c && "ring-2 ring-primary ring-offset-2",
-                      )}
-                      style={{ backgroundColor: c }}
-                    />
-                  ))}
-                  <input
-                    type="color"
-                    aria-label="Custom highlight color"
-                    value={style.activeColor}
-                    onChange={(e) => updateColor("activeColor", e.target.value)}
-                    className="h-8 w-8 cursor-pointer rounded-full border border-outline-variant bg-transparent p-0"
-                  />
-                </div>
-              </div>
-              {colorWarning && <p className="text-sm text-error">{colorWarning}</p>}
-
-              {/* Toggle */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-label-md text-on-surface">Dynamic Animation</h4>
-                  <p className="text-label-sm text-on-surface-variant">Highlight each word as it's spoken</p>
-                </div>
-                <Switch checked={style.animate} onCheckedChange={(checked) => updateStyle({ animate: checked })} />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-label-md text-on-surface">Text Outline</h4>
-                  <p className="text-label-sm text-on-surface-variant">Dark stroke around letters for readability</p>
-                </div>
-                <Switch checked={style.outline} onCheckedChange={(checked) => updateStyle({ outline: checked })} />
-              </div>
+              <CaptionStyleControls style={style} onChange={updateStyle} />
 
               {/* Word timing / text */}
               <div>
