@@ -20,6 +20,7 @@ import { CheckpointManager } from "../pipeline/checkpoint";
 import {
   finalClipPath,
   finalThumbnailPath,
+  generateMoreClips,
   processSelectedClips,
   regenerateCaptionOverlay,
   retranscribeCaptionOverlay,
@@ -199,6 +200,10 @@ function seedRunFromExistingDownload(checkpoint: CheckpointManager, dl: Download
 export function createServer(checkpoint: CheckpointManager = new CheckpointManager(), port: number = config.webPort) {
   return Bun.serve({
     port,
+    // Bun's default idleTimeout (10s) is too short for the synchronous AI/ffmpeg/Whisper calls this
+    // server already awaits directly in a handler (caption regenerate/retranscribe, and now
+    // generate-more's IDENTIFY_CLIPS re-run) — DeepSeek's own retry+backoff alone can exceed 10s.
+    idleTimeout: 120,
     routes: withAuth({
       "/": homepage,
       // Client-side routes (App.tsx's `parseRoute`) — served the same SPA shell so direct nav/refresh doesn't 404.
@@ -406,6 +411,25 @@ export function createServer(checkpoint: CheckpointManager = new CheckpointManag
             log("error", "background processSelectedClips failed", { runId: run.id, error: errMsg(err) }),
           );
           return json({ ok: true });
+        },
+      },
+
+      // Re-runs IDENTIFY_CLIPS and appends the results to clips.json — a single AI call, so
+      // (unlike /select's full render pipeline) this is awaited and returns the new clips directly
+      // instead of running in the background (PRD §5 item #22, G18).
+      "/api/runs/:id/generate-more": {
+        POST: async (req) => {
+          const run = checkpoint.getRun(req.params.id!);
+          if (!run) return json({ error: "not found" }, { status: 404 });
+          if (!["awaiting_selection", "running", "completed"].includes(run.status)) {
+            return json({ error: "run has not finished identifying clips yet" }, { status: 400 });
+          }
+          try {
+            const clips = await generateMoreClips(checkpoint, run.id);
+            return json({ clips });
+          } catch (err) {
+            return json({ error: errMsg(err) }, { status: 500 });
+          }
         },
       },
 

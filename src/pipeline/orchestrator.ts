@@ -27,6 +27,7 @@ import {
   type EndingWatermarkOptions,
   type PreProductionOptions,
   type RunOptions,
+  type TokenUsage,
   type Transcript,
   type WatermarkOptions,
 } from "./types";
@@ -340,6 +341,47 @@ export async function runUntilSelection(
   } catch (err) {
     failRun(checkpoint, runId, err);
   }
+}
+
+/**
+ * Re-runs IDENTIFY_CLIPS on a run already past selection (`awaiting_selection`/`running`/`completed`),
+ * appending the fresh AI candidates to `clips.json` alongside whatever's already there — never
+ * overwrites existing candidates or the user's edits (PRD §5 item #22, G18). Returns just the new
+ * clips so the caller doesn't need to diff the merged list.
+ */
+export async function generateMoreClips(checkpoint: CheckpointManager, runId: string): Promise<ClipCandidate[]> {
+  const runDir = join(config.runsDir, runId);
+  const downloadResult = await readJson<DownloadResult>(join(runDir, "download-result.json"));
+  const transcript = await readJson<Transcript>(join(runDir, "transcript.json"));
+  const options = await readRunOptions(runDir);
+
+  const { clips: newClips, tokenUsage } = await identifyClips(transcript, downloadResult.durationSec, options);
+
+  const clipsJsonPath = join(runDir, "clips.json");
+  const existingClips = existsSync(clipsJsonPath) ? await readJson<ClipCandidate[]>(clipsJsonPath) : [];
+  await writeJson(clipsJsonPath, [...existingClips, ...newClips]);
+
+  // Accumulate onto whatever tokenUsage the original IDENTIFY_CLIPS call recorded, so the
+  // cost tracker (PRD §5 item #4 / G7) reflects every AI call for this run, not just the first.
+  const prevResult = checkpoint.getStageResult(runId, "IDENTIFY_CLIPS");
+  const prevUsage = prevResult?.resultJson
+    ? ((JSON.parse(prevResult.resultJson) as { tokenUsage: TokenUsage | null }).tokenUsage ?? null)
+    : null;
+  const combinedUsage: TokenUsage | null =
+    prevUsage && tokenUsage
+      ? {
+          promptTokens: prevUsage.promptTokens + tokenUsage.promptTokens,
+          completionTokens: prevUsage.completionTokens + tokenUsage.completionTokens,
+          totalTokens: prevUsage.totalTokens + tokenUsage.totalTokens,
+        }
+      : (tokenUsage ?? prevUsage);
+  checkpoint.completeStage(
+    runId,
+    "IDENTIFY_CLIPS",
+    JSON.stringify({ count: existingClips.length + newClips.length, tokenUsage: combinedUsage }),
+  );
+
+  return newClips;
 }
 
 /**

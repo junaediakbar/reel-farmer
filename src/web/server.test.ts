@@ -11,6 +11,9 @@ const processSelectedClipsCalls: Array<{
   preProduction?: PreProductionOptions;
 }> = [];
 
+let generateMoreClipsResult: ClipCandidate[] | Error = [];
+const generateMoreClipsCalls: string[] = [];
+
 mock.module("../pipeline/orchestrator", () => ({
   runUntilSelection: mock(async () => {}),
   processSelectedClips: mock(
@@ -26,6 +29,11 @@ mock.module("../pipeline/orchestrator", () => ({
   ),
   regenerateCaptionOverlay: mock(async () => {}),
   retranscribeCaptionOverlay: mock(async () => {}),
+  generateMoreClips: mock(async (_cp: unknown, runId: string) => {
+    generateMoreClipsCalls.push(runId);
+    if (generateMoreClipsResult instanceof Error) throw generateMoreClipsResult;
+    return generateMoreClipsResult;
+  }),
   finalClipPath: (outputDir: string, clip: ClipCandidate) => join(outputDir, `${clip.title}-${clip.id}.mp4`),
   finalThumbnailPath: (outputDir: string, clip: ClipCandidate) => join(outputDir, `${clip.title}-${clip.id}.jpg`),
 }));
@@ -42,6 +50,8 @@ let baseUrl: string;
 
 beforeEach(() => {
   processSelectedClipsCalls.length = 0;
+  generateMoreClipsCalls.length = 0;
+  generateMoreClipsResult = [];
   delete process.env.LICENSE_SERVER_URL;
   checkpoint = new CheckpointManager(":memory:");
   server = createServer(checkpoint, 0);
@@ -166,6 +176,44 @@ describe("GET /api/runs/:id/video", () => {
     expect(await res.text()).toBe("2345");
 
     rmSync(runDir, { recursive: true, force: true });
+  });
+});
+
+describe("POST /api/runs/:id/generate-more", () => {
+  test("404 for an unknown run", async () => {
+    const res = await fetch(`${baseUrl}/api/runs/nope/generate-more`, { method: "POST" });
+    expect(res.status).toBe(404);
+  });
+
+  test("400 for a run that hasn't finished IDENTIFY_CLIPS yet", async () => {
+    const run = checkpoint.createRun("run-pending", "vid-1", "https://x", null); // default status: pending
+    const res = await fetch(`${baseUrl}/api/runs/${run.id}/generate-more`, { method: "POST" });
+    expect(res.status).toBe(400);
+    expect(generateMoreClipsCalls).toHaveLength(0);
+  });
+
+  test("returns the new clips for a run awaiting selection", async () => {
+    const run = checkpoint.createRun("run-await", "vid-1", "https://x", null);
+    checkpoint.updateRunStatus(run.id, "awaiting_selection", null);
+    const newClips: ClipCandidate[] = [
+      { id: "more-1", title: "More clip", hookLine: "hook", startSec: 0, endSec: 10, reason: "r", viralScore: 50, tags: [] },
+    ];
+    generateMoreClipsResult = newClips;
+
+    const res = await fetch(`${baseUrl}/api/runs/${run.id}/generate-more`, { method: "POST" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ clips: newClips });
+    expect(generateMoreClipsCalls).toEqual([run.id]);
+  });
+
+  test("500 with the error message if generateMoreClips throws", async () => {
+    const run = checkpoint.createRun("run-completed", "vid-1", "https://x", null);
+    checkpoint.updateRunStatus(run.id, "completed", null);
+    generateMoreClipsResult = new Error("DeepSeek quota exceeded");
+
+    const res = await fetch(`${baseUrl}/api/runs/${run.id}/generate-more`, { method: "POST" });
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "DeepSeek quota exceeded" });
   });
 });
 

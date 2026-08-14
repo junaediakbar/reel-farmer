@@ -97,7 +97,9 @@ mock.module("../modules/composer", () => ({
   extractBestFrameThumbnail: mock(async () => {}),
 }));
 
-const { runPipeline, runUntilSelection, processSelectedClips, regenerateCaptionOverlay } = await import("./orchestrator");
+const { runPipeline, runUntilSelection, processSelectedClips, regenerateCaptionOverlay, generateMoreClips } = await import(
+  "./orchestrator"
+);
 const { CheckpointManager } = await import("./checkpoint");
 const { config } = await import("../config");
 
@@ -186,6 +188,35 @@ describe("runUntilSelection", () => {
 
     const clipsJson = await Bun.file(join(config.runsDir, runs[0]!.id, "clips.json")).json();
     expect(clipsJson).toEqual(clipsToReturn);
+    cp.close();
+  });
+});
+
+describe("generateMoreClips", () => {
+  test("appends new AI candidates to clips.json without dropping existing/custom ones, and accumulates token usage", async () => {
+    const cp = new CheckpointManager(":memory:");
+    await runUntilSelection(cp, "https://youtube.com/watch?v=vid-1");
+    const runId = cp.listRuns()[0]!.id;
+
+    // Simulate a custom clip the user added client-side and rendered — generateMoreClips must
+    // not clobber it (clips.json is the durable record of every candidate ever seen, per
+    // processSelectedClips's own contract).
+    const clipsJsonPath = join(config.runsDir, runId, "clips.json");
+    const seeded = (await Bun.file(clipsJsonPath).json()) as ClipCandidate[];
+    const customClip: ClipCandidate = { ...fixtureClips(1)[0]!, id: "custom-1", title: "My custom clip" };
+    await Bun.write(clipsJsonPath, JSON.stringify([...seeded, customClip]));
+
+    clipsToReturn = fixtureClips(2).map((c) => ({ ...c, id: `more-${c.id}` }));
+    const returned = await generateMoreClips(cp, runId);
+
+    expect(returned).toEqual(clipsToReturn);
+    const clipsJson = (await Bun.file(clipsJsonPath).json()) as ClipCandidate[];
+    expect(clipsJson).toEqual([...seeded, customClip, ...clipsToReturn]);
+
+    const stageResult = cp.getStageResult(runId, "IDENTIFY_CLIPS");
+    const { tokenUsage } = JSON.parse(stageResult!.resultJson!) as { tokenUsage: { totalTokens: number } };
+    // First IDENTIFY_CLIPS call used 15 tokens (mock); generateMoreClips's own call adds another 15.
+    expect(tokenUsage.totalTokens).toBe(30);
     cp.close();
   });
 });

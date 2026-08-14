@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
   CLIP_STAGES,
   DEFAULT_CAPTION_STYLE,
@@ -145,9 +145,60 @@ function renderPhasePct(clips: ClipCandidate[], clipProgress: ClipProgress[]): n
   return Math.round((completed / total) * 100);
 }
 
+interface UndoableState<T> {
+  present: T;
+  past: T[];
+  future: T[];
+}
+
+type UndoableAction<T> = { type: "set"; updater: T | ((prev: T) => T) } | { type: "undo" } | { type: "redo" };
+
+/** Plain reducer (no React) so undo/redo/set transitions are unit-testable the same way as this
+ * file's other pure helpers (parseImportedClips) — no rendering harness needed. "set" carries the
+ * updater itself (not a precomputed value) and resolves it against `state.present` here, inside the
+ * reducer — the same trick React's own setState(updater) uses so a stale closure (e.g. refresh()'s
+ * setInterval callback, captured once at mount) still always sees the latest state, not a snapshot
+ * from whenever that closure was created. */
+export function undoableReducer<T>(state: UndoableState<T>, action: UndoableAction<T>): UndoableState<T> {
+  switch (action.type) {
+    case "set": {
+      const next = typeof action.updater === "function" ? (action.updater as (p: T) => T)(state.present) : action.updater;
+      if (next === state.present) return state;
+      return { present: next, past: [...state.past, state.present], future: [] };
+    }
+    case "undo":
+      if (state.past.length === 0) return state;
+      return {
+        present: state.past[state.past.length - 1]!,
+        past: state.past.slice(0, -1),
+        future: [state.present, ...state.future],
+      };
+    case "redo":
+      if (state.future.length === 0) return state;
+      return { present: state.future[0]!, past: [...state.past, state.present], future: state.future.slice(1) };
+  }
+}
+
+/** Wraps a value in undo/redo history — every state-changing `set` call is one undo step. */
+function useUndoableState<T>(initial: T) {
+  const [state, dispatch] = useReducer(undoableReducer<T>, { present: initial, past: [], future: [] });
+
+  function set(updater: T | ((prev: T) => T)) {
+    dispatch({ type: "set", updater });
+  }
+
+  return [
+    state.present,
+    set,
+    { undo: () => dispatch({ type: "undo" }), redo: () => dispatch({ type: "redo" }), canUndo: state.past.length > 0, canRedo: state.future.length > 0 },
+  ] as const;
+}
+
 export function RunDetail({ runId, onBack, onDeleted, onOpenCaptions }: RunDetailProps) {
   const [data, setData] = useState<RunDetailData | null>(null);
-  const [editableClips, setEditableClips] = useState<EditableClip[]>([]);
+  const [editableClips, setEditableClips, { undo, redo, canUndo, canRedo }] = useUndoableState<EditableClip[]>([]);
+  const [generatingMore, setGeneratingMore] = useState(false);
+  const [generateMoreError, setGenerateMoreError] = useState<string | null>(null);
   const [importText, setImportText] = useState("");
   const [importOpen, setImportOpen] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
@@ -219,10 +270,32 @@ export function RunDetail({ runId, onBack, onDeleted, onOpenCaptions }: RunDetai
     // ?purge also drops it from clips.json server-side — otherwise it was only removed from
     // local state and would reappear (still an AI candidate) on the next refresh.
     fetch(`/api/runs/${runId}/clips/${id}?purge=1`, { method: "DELETE" });
+    // ponytail: this DELETE unconditionally destroys the rendered mp4/thumbnail too (server.ts), so
+    // undoing a Remove on an already-rendered clip brings the candidate back as "Pending", not
+    // "Rendered" — the render itself isn't recoverable by undo. Upgrade: make the server only purge
+    // clips.json here and move render-file deletion to a separate explicit action, if that gap matters.
   }
 
   function addCustomClip() {
     setEditableClips((prev) => [...prev, newCustomClip()]);
+  }
+
+  async function generateMoreClips() {
+    setGeneratingMore(true);
+    setGenerateMoreError(null);
+    try {
+      const res = await fetch(`/api/runs/${runId}/generate-more`, { method: "POST" });
+      const body = (await res.json().catch(() => ({}))) as { clips?: ClipCandidate[]; error?: string };
+      if (res.ok && body.clips) {
+        setEditableClips((prev) => [...prev, ...body.clips!.map((c) => ({ ...c, selected: false }))]);
+      } else {
+        setGenerateMoreError(body.error ?? "Failed to generate more clips");
+      }
+    } catch (err) {
+      setGenerateMoreError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setGeneratingMore(false);
+    }
   }
 
   function importJson() {
@@ -386,9 +459,19 @@ export function RunDetail({ runId, onBack, onDeleted, onOpenCaptions }: RunDetai
 
           {/* Right: AI-identified candidates, selectable for export */}
           <div className="col-span-12 flex max-h-[calc(100vh-11rem)] flex-col overflow-hidden rounded-3xl border border-outline-variant/20 bg-surface-container-lowest shadow-sm lg:col-span-4">
-            <div className="sticky top-0 z-10 border-b border-outline-variant/20 bg-surface-container-lowest p-6">
-              <h2 className="text-headline-md text-on-surface">AI Selections</h2>
-              <p className="mt-1 text-label-sm text-on-surface-variant">{editableClips.length} clips identified</p>
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-2 border-b border-outline-variant/20 bg-surface-container-lowest p-6">
+              <div>
+                <h2 className="text-headline-md text-on-surface">AI Selections</h2>
+                <p className="mt-1 text-label-sm text-on-surface-variant">{editableClips.length} clips identified</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <Button variant="ghost" size="sm" onClick={undo} disabled={!canUndo} aria-label="Undo">
+                  <span className="material-symbols-outlined text-[16px]">undo</span>
+                </Button>
+                <Button variant="ghost" size="sm" onClick={redo} disabled={!canRedo} aria-label="Redo">
+                  <span className="material-symbols-outlined text-[16px]">redo</span>
+                </Button>
+              </div>
             </div>
 
             <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
@@ -555,6 +638,16 @@ export function RunDetail({ runId, onBack, onDeleted, onOpenCaptions }: RunDetai
             </div>
 
             <div className="border-t border-outline-variant/20 bg-surface-container-lowest/90 p-4 backdrop-blur-sm">
+              <Button
+                variant="ghost"
+                className="mb-2 w-full justify-center rounded-xl bg-surface-container-high"
+                onClick={generateMoreClips}
+                disabled={generatingMore}
+              >
+                <span className="material-symbols-outlined">auto_awesome</span>
+                {generatingMore ? "Generating…" : "Generate more clips"}
+              </Button>
+              {generateMoreError && <p className="mb-2 text-sm text-error">{generateMoreError}</p>}
               <Button variant="ghost" className="w-full justify-center rounded-xl bg-surface-container-high" onClick={addCustomClip}>
                 <span className="material-symbols-outlined">add</span>
                 Add custom clip
